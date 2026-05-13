@@ -16,6 +16,7 @@ import Expenses from './pages/Expenses'
 import ProfileSettings from './pages/ProfileSettings'
 import Staff from './pages/Staff'
 import AuditLog from './pages/AuditLog'
+import HowToUse from './pages/HowToUse'
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -46,6 +47,7 @@ const Layout = ({ children }) => {
     { name: 'Staff', path: '/staff', icon: '👨‍💼', adminOnly: true },
     { name: 'Audit Log', path: '/audit', icon: '🕵️‍♂️', adminOnly: true },
     { name: 'Shop Profile', path: '/profile', icon: '⚙️' },
+    { name: 'How to Use', path: '/how-to-use', icon: '📘' },
   ].filter(item => {
     if (user?.role === 'Staff' && item.adminOnly) return false;
     return true;
@@ -199,6 +201,7 @@ function App() {
           <Route path="/profile" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
           <Route path="/staff" element={<AdminRoute><Staff /></AdminRoute>} />
           <Route path="/audit" element={<AdminRoute><AuditLog /></AdminRoute>} />
+          <Route path="/how-to-use" element={<ProtectedRoute><HowToUse /></ProtectedRoute>} />
         </Routes>
       </Layout>
     </Router>
