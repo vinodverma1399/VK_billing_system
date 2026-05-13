@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Environment variables (SECRETS - never push!)
+.env
+.env.local
+.env.production.local
+
+# Build output
+dist/
+dist-ssr/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Test files
+*.local
