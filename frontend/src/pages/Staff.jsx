@@ -118,8 +118,8 @@ const Staff = () => {
                       {u.role || 'Staff'}
                     </span>
                   </td>
-                  <td className="px-8 py-5">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <td className="px-8 py-5 sticky right-0 bg-white lg:bg-transparent shadow-[-10px_0_10px_-5px_rgba(0,0,0,0.05)] lg:shadow-none">
+                    <div className="flex justify-end gap-2">
                       <button onClick={() => openEdit(u)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition">✏️</button>
                       <button onClick={() => handleDelete(u._id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition">🗑️</button>
                     </div>

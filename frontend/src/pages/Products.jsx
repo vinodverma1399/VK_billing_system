@@ -234,7 +234,7 @@ const Products = () => {
                         <div className="text-xs text-gray-400">{new Date(p.createdAt).toLocaleDateString('en-IN')}</div>
                       </td>
                     )}
-                    <td className="px-8 py-6 text-right">
+                    <td className="px-8 py-6 sticky right-0 bg-white lg:bg-transparent shadow-[-10px_0_10px_-5px_rgba(0,0,0,0.05)] lg:shadow-none">
                       {p.status === 'pending' && userRole === 'Admin' ? (
                         <div className="flex justify-end gap-2">
                           <button
@@ -249,7 +249,7 @@ const Products = () => {
                       ) : p.status === 'pending' && userRole === 'Staff' ? (
                         <span className="text-[10px] text-amber-500 font-bold italic">Awaiting approval</span>
                       ) : userRole === 'Admin' ? (
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex justify-end gap-2">
                           <button onClick={() => openEdit(p)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition">✏️</button>
                           <button onClick={() => handleDelete(p._id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition">🗑️</button>
                         </div>

@@ -211,8 +211,8 @@ const Vendors = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-8 py-5">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="px-8 py-5 sticky right-0 bg-white lg:bg-transparent shadow-[-10px_0_10px_-5px_rgba(0,0,0,0.05)] lg:shadow-none">
+                      <div className="flex justify-end gap-2">
                         <button onClick={() => openStatement(v)} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-black hover:bg-emerald-100 transition">📒 Ledger</button>
                         {userRole === 'Admin' && <>
                           <button onClick={() => openEdit(v)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition">✏️</button>

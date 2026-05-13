@@ -187,8 +187,8 @@ const Expenses = () => {
                 <td className="px-6 py-4 text-gray-600 font-medium">{exp.paymentMethod}</td>
                 <td className="px-6 py-4 text-gray-500 font-medium">{new Date(exp.date).toLocaleDateString('en-IN')}</td>
                 <td className="px-6 py-4 text-right font-black text-gray-900 text-base">₹{exp.amount.toLocaleString()}</td>
-                <td className="px-6 py-4">
-                  <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <td className="px-6 py-4 sticky right-0 bg-white lg:bg-transparent shadow-[-10px_0_10px_-5px_rgba(0,0,0,0.05)] lg:shadow-none">
+                  <div className="flex justify-end gap-2">
                     <button onClick={() => openEdit(exp)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition">✏️</button>
                     <button onClick={() => handleDelete(exp._id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition">🗑️</button>
                   </div>

@@ -220,7 +220,7 @@ const Returns = () => {
                         {ret.status === 'Approved' ? '📦 Restored' : '📦 Not Restored'}
                       </span>
                     </td>
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 sticky right-0 bg-white lg:bg-transparent shadow-[-10px_0_10px_-5px_rgba(0,0,0,0.05)] lg:shadow-none">
                       {isUpdating ? (
                         <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
                       ) : ret.status === 'Approved' ? (
