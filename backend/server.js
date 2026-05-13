@@ -56,32 +56,31 @@ app.use('/api/audit', require('./routes/auditRoutes'));
 // Database connection
 const connectDB = async () => {
   try {
-    const useDummy = process.env.USE_DUMMY_DB === 'true';
-
-    if (useDummy || !process.env.MONGO_URI) {
-      const { MongoMemoryServer } = require('mongodb-memory-server');
-      const mongod = await MongoMemoryServer.create();
-      const uri = mongod.getUri();
-      await mongoose.connect(uri);
-      console.log('🚀 Running in DUMMY MODE (In-Memory Database)');
-      console.log('Note: Data will be lost when server restarts.');
-    } else {
+    if (process.env.NODE_ENV === 'production') {
+      if (!process.env.MONGO_URI) {
+        throw new Error('MONGO_URI is missing in production environment!');
+      }
       await mongoose.connect(process.env.MONGO_URI);
-      console.log('✅ Connected to MongoDB Atlas');
+      console.log('✅ Connected to MongoDB Atlas (Production)');
+    } else {
+      // Development mode with optional dummy fallback
+      const useDummy = process.env.USE_DUMMY_DB === 'true';
+      if (useDummy || !process.env.MONGO_URI) {
+        const { MongoMemoryServer } = require('mongodb-memory-server');
+        const mongod = await MongoMemoryServer.create();
+        await mongoose.connect(mongod.getUri());
+        console.log('🚀 Running in DUMMY MODE (Development)');
+      } else {
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log('✅ Connected to MongoDB Atlas (Development)');
+      }
     }
   } catch (err) {
-    console.error('❌ MongoDB Connection Error:', err.message);
-
-    // Automatic Fallback to Memory Server if Atlas fails
-    try {
-      console.log('🔄 Attempting fallback to In-Memory Database...');
-      const { MongoMemoryServer } = require('mongodb-memory-server');
-      const mongod = await MongoMemoryServer.create();
-      await mongoose.connect(mongod.getUri());
-      console.log('🚀 Fallback Successful: Running in DUMMY MODE');
-    } catch (fallbackErr) {
-      console.error('Critical Error: Could not start even dummy database', fallbackErr);
-      process.exit(1);
+    console.error('❌ Database Connection Error:', err.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1); // Exit in production if DB fails
+    } else {
+      console.log('Continuing in dev mode (DB failed)...');
     }
   }
 };
