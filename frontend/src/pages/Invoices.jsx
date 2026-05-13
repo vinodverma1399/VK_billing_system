@@ -257,8 +257,8 @@ const Invoices = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="px-8 py-6 sticky right-0 bg-white lg:bg-transparent shadow-[-10px_0_10px_-5px_rgba(0,0,0,0.05)] lg:shadow-none">
+                      <div className="flex justify-end gap-2">
                         <button
                           onClick={() => printThermal(inv)}
                           className="flex items-center gap-1 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition text-xs font-bold"

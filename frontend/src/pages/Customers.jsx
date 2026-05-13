@@ -320,8 +320,8 @@ const Customers = () => {
                             <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 font-black text-xs border border-emerald-100">Cleared</span>
                           )}
                         </td>
-                        <td className="px-8 py-5">
-                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <td className="px-8 py-5 sticky right-0 bg-white lg:bg-transparent shadow-[-10px_0_10px_-5px_rgba(0,0,0,0.05)] lg:shadow-none">
+                          <div className="flex justify-end gap-2">
                             <button onClick={() => openStatement(c)} className="px-3 py-1.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-black hover:bg-gray-100 transition">📋 Statement</button>
                             {userRole === 'Admin' ? (
                               <>
