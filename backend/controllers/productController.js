@@ -159,6 +159,7 @@ const updateProduct = async (req, res) => {
 // @access  Private / Admin
 const deleteProduct = async (req, res) => {
   try {
+    const product = await Product.findOne({ _id: req.params.id, user: req.ownerId });
     if (product) {
       const productName = product.name;
       await product.deleteOne();

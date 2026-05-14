@@ -51,6 +51,7 @@ const createCategory = async (req, res) => {
 // @access  Private / Admin
 const deleteCategory = async (req, res) => {
   try {
+    const category = await Category.findOne({ _id: req.params.id, user: req.ownerId });
     if (category) {
       const categoryName = category.name;
       await category.deleteOne();
