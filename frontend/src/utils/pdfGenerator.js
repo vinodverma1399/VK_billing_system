@@ -19,8 +19,8 @@ const getShopInfo = () => {
 };
 
 // ── A4 Invoice PDF ──────────────────────────────────────────────────────
-export const generateInvoicePDF = (inv) => {
-  if (!inv) { console.error('No invoice data'); return; }
+export const buildInvoiceDoc = (inv) => {
+  if (!inv) { console.error('No invoice data'); return null; }
 
   try {
     const doc = new jsPDF();
@@ -157,10 +157,46 @@ export const generateInvoicePDF = (inv) => {
     doc.text('This is a computer-generated invoice.', pageWidth / 2, 287, { align: 'center' });
     doc.text('Powered by VK Billing System', pageWidth / 2, 292, { align: 'center' });
 
-    doc.save(`${invNum}.pdf`);
+    return doc;
   } catch (err) {
     console.error('PDF error:', err);
     alert('Failed to generate PDF. Check console.');
+    return null;
+  }
+};
+
+export const generateInvoicePDF = (inv) => {
+  const doc = buildInvoiceDoc(inv);
+  if (doc) {
+    const invNum = inv.invoiceNumber || `#${(inv._id || '').toString().substring(18).toUpperCase()}`;
+    doc.save(`${invNum}.pdf`);
+  }
+};
+
+export const shareInvoicePDF = async (inv) => {
+  const doc = buildInvoiceDoc(inv);
+  if (!doc) return;
+  
+  const invNum = inv.invoiceNumber || `#${(inv._id || '').toString().substring(18).toUpperCase()}`;
+  const shop = getShopInfo();
+  const pdfBlob = doc.output('blob');
+  const file = new File([pdfBlob], `Invoice_${invNum}.pdf`, { type: 'application/pdf' });
+  
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: `Invoice ${invNum}`,
+        text: `Hello! Here is your invoice from ${shop.shopName}.`
+      });
+    } catch (err) { console.error('Share cancelled', err); }
+  } else {
+    doc.save(`Invoice_${invNum}.pdf`);
+    alert('Direct PDF sharing is not supported on this device. The PDF has been downloaded. We will now open WhatsApp so you can attach it manually.');
+    const mobile = inv.customer?.mobile || inv.customerMobile;
+    const text = encodeURIComponent(`Hello! Here is your invoice ${invNum} from ${shop.shopName}. (Please find the attached PDF)`);
+    const url = mobile ? `https://wa.me/91${mobile}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
   }
 };
 

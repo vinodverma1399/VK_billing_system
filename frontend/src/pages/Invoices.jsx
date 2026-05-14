@@ -93,10 +93,67 @@ const Invoices = () => {
 
   const handleWhatsAppShare = (inv) => {
     const shopName = userInfo.shopName || "Our Shop";
-    const custName = inv.customer?.name || 'Valued Customer';
-    const invNo = inv.invoiceNumber || inv._id.substring(18).toUpperCase();
-    const text = `Hello ${custName},\n\nThank you for shopping with ${shopName}!\n\nYour Invoice #${invNo} for ₹${inv.finalAmount.toLocaleString()} is ready.\nStatus: ${inv.status}\n\nHave a great day!`;
-    
+    const prop = userInfo.ownerName || userInfo.name;
+    const address = userInfo.shopAddress ? `${userInfo.shopAddress}\n` : '';
+    const shopMobile = userInfo.shopPhone ? `Mob: ${userInfo.shopPhone}\n` : '';
+    const gst = userInfo.shopGst ? `GST: ${userInfo.shopGst}\n` : '';
+
+    let text = `*${shopName}*\n`;
+    if (prop) text += `Prop: ${prop}\n`;
+    text += `${address}${shopMobile}${gst}`;
+    text += `------------------------\n`;
+    text += `Invoice: ${inv.invoiceNumber || inv._id.substring(18).toUpperCase()}\n`;
+    text += `Date: ${new Date(inv.createdAt).toLocaleDateString('en-IN')}\n`;
+    text += `Customer: ${inv.customer?.name || 'Walk-in'}\n`;
+    if (inv.customer?.mobile || inv.customerMobile) {
+      text += `Mobile: ${inv.customer?.mobile || inv.customerMobile}\n`;
+    }
+    text += `------------------------\n`;
+    text += `*Category | Item | Qty | Amt*\n`;
+    text += `------------------------\n`;
+
+    if (inv.products && inv.products.length > 0) {
+      inv.products.forEach(p => {
+        const cat = p.product?.category || p.category || '-';
+        const name = p.product?.name || 'Item';
+        const qty = p.quantity;
+        const unit = p.product?.unit || 'Pc';
+        const amt = p.total;
+        text += `${cat} | ${name} | ${qty} ${unit} | ₹${amt}\n`;
+      });
+    }
+
+    text += `------------------------\n`;
+    const subTotal = inv.subTotal || inv.products?.reduce((s, p) => s + (p.price * p.quantity), 0) || 0;
+    const totalGst = inv.totalGst || 0;
+    const discount = inv.totalDiscount || 0;
+
+    text += `Subtotal: Rs ${subTotal}\n`;
+    if (totalGst > 0) text += `GST: Rs ${totalGst}\n`;
+    if (discount > 0) text += `Discount: -Rs ${discount}\n`;
+    text += `------------------------\n`;
+    text += `*TOTAL: Rs ${inv.finalAmount}*\n\n`;
+
+    if (inv.status === 'Paid' || inv.amountPaid >= inv.finalAmount) {
+      text += `      ✓ PAID IN FULL\n`;
+    } else {
+      const balance = inv.finalAmount - (inv.amountPaid || 0);
+      text += `Paid: Rs ${inv.amountPaid || 0}\n`;
+      text += `Balance: Rs ${balance}\n`;
+      
+      const upiId = userInfo.upiId;
+      if (upiId) {
+        const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(shopName)}&am=${balance}&cu=INR`;
+        text += `\n💳 *PAYMENT PENDING*\n`;
+        text += `UPI ID: ${upiId}\n`;
+        text += `Click to Pay: ${upiLink}\n`;
+      }
+    }
+
+    text += `------------------------\n`;
+    text += `   Thank you for shopping!\n`;
+    text += `   Powered by VK Billing System`;
+
     const encodedText = encodeURIComponent(text);
     const mobile = inv.customer?.mobile || inv.customerMobile;
     const url = mobile 
@@ -231,7 +288,17 @@ const Invoices = () => {
                     </td>
                     <td className="px-8 py-6">
                       <div className="font-bold text-gray-900 text-base">{inv.customer?.name || 'Walk-in Client'}</div>
-                      <div className="text-xs text-accent font-bold">{inv.customer?.mobile || inv.customerMobile}</div>
+                      { (inv.customer?.mobile || inv.customerMobile) && (
+                        <a 
+                          href={`https://wa.me/91${inv.customer?.mobile || inv.customerMobile}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs text-accent font-bold hover:underline flex items-center gap-1 mt-0.5"
+                          title="Message on WhatsApp"
+                        >
+                          <span className="text-[#25D366]">💬</span> {inv.customer?.mobile || inv.customerMobile}
+                        </a>
+                      )}
                     </td>
                     <td className="px-8 py-6 text-gray-500 font-medium">
                       {new Date(inv.createdAt).toLocaleDateString()}

@@ -162,10 +162,67 @@ const CreateInvoice = () => {
   const handleWhatsAppShare = () => {
     if (!lastInvoice) return;
     const shopName = userInfo.shopName || "Our Shop";
-    const custName = lastInvoice.customer?.name || 'Valued Customer';
-    const invNo = lastInvoice.invoiceNumber || lastInvoice._id.substring(18).toUpperCase();
-    const text = `Hello ${custName},\n\nThank you for shopping with ${shopName}!\n\nYour Invoice #${invNo} for ₹${lastInvoice.finalAmount.toLocaleString()} is ready.\nStatus: ${lastInvoice.status}\n\nHave a great day!`;
-    
+    const prop = userInfo.ownerName || userInfo.name;
+    const address = userInfo.shopAddress ? `${userInfo.shopAddress}\n` : '';
+    const shopMobile = userInfo.shopPhone ? `Mob: ${userInfo.shopPhone}\n` : '';
+    const gst = userInfo.shopGst ? `GST: ${userInfo.shopGst}\n` : '';
+
+    let text = `*${shopName}*\n`;
+    if (prop) text += `Prop: ${prop}\n`;
+    text += `${address}${shopMobile}${gst}`;
+    text += `------------------------\n`;
+    text += `Invoice: ${lastInvoice.invoiceNumber || lastInvoice._id.substring(18).toUpperCase()}\n`;
+    text += `Date: ${new Date(lastInvoice.createdAt).toLocaleDateString('en-IN')}\n`;
+    text += `Customer: ${lastInvoice.customer?.name || 'Walk-in'}\n`;
+    if (lastInvoice.customer?.mobile || customerMobile) {
+      text += `Mobile: ${lastInvoice.customer?.mobile || customerMobile}\n`;
+    }
+    text += `------------------------\n`;
+    text += `*Category | Item | Qty | Amt*\n`;
+    text += `------------------------\n`;
+
+    if (lastInvoice.products && lastInvoice.products.length > 0) {
+      lastInvoice.products.forEach(p => {
+        const cat = p.product?.category || p.category || '-';
+        const name = p.product?.name || 'Item';
+        const qty = p.quantity;
+        const unit = p.product?.unit || 'Pc';
+        const amt = p.total;
+        text += `${cat} | ${name} | ${qty} ${unit} | ₹${amt}\n`;
+      });
+    }
+
+    text += `------------------------\n`;
+    const subTotal = lastInvoice.subTotal || lastInvoice.products?.reduce((s, p) => s + (p.price * p.quantity), 0) || 0;
+    const totalGst = lastInvoice.totalGst || 0;
+    const discount = lastInvoice.totalDiscount || 0;
+
+    text += `Subtotal: Rs ${subTotal}\n`;
+    if (totalGst > 0) text += `GST: Rs ${totalGst}\n`;
+    if (discount > 0) text += `Discount: -Rs ${discount}\n`;
+    text += `------------------------\n`;
+    text += `*TOTAL: Rs ${lastInvoice.finalAmount}*\n\n`;
+
+    if (lastInvoice.status === 'Paid' || lastInvoice.amountPaid >= lastInvoice.finalAmount) {
+      text += `      ✓ PAID IN FULL\n`;
+    } else {
+      const balance = lastInvoice.finalAmount - (lastInvoice.amountPaid || 0);
+      text += `Paid: Rs ${lastInvoice.amountPaid || 0}\n`;
+      text += `Balance: Rs ${balance}\n`;
+      
+      const upiId = userInfo.upiId;
+      if (upiId) {
+        const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(shopName)}&am=${balance}&cu=INR`;
+        text += `\n💳 *PAYMENT PENDING*\n`;
+        text += `UPI ID: ${upiId}\n`;
+        text += `Click to Pay: ${upiLink}\n`;
+      }
+    }
+
+    text += `------------------------\n`;
+    text += `   Thank you for shopping!\n`;
+    text += `   Powered by VK Billing System`;
+
     const encodedText = encodeURIComponent(text);
     const mobile = lastInvoice.customer?.mobile || customerMobile;
     const url = mobile 

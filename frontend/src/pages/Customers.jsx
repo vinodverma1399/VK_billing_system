@@ -309,7 +309,19 @@ const Customers = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-8 py-5 font-bold text-gray-700">{c.mobile}</td>
+                        <td className="px-8 py-5 font-bold text-gray-700">
+                          {c.mobile && (
+                            <a 
+                              href={`https://wa.me/91${c.mobile}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="hover:text-[#25D366] hover:underline flex items-center gap-1.5 transition-colors"
+                              title="Message on WhatsApp"
+                            >
+                              <span className="text-[#25D366] text-lg">💬</span> {c.mobile}
+                            </a>
+                          )}
+                        </td>
                         <td className="px-8 py-5">
                           <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-xl text-xs font-black">{custInvoices.length} bills</span>
                         </td>
