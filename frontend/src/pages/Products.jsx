@@ -155,17 +155,20 @@ const Products = () => {
   };
 
   const activeProducts = products.filter(p => p.status === 'active' &&
-    (categoryFilter === 'All' || p.category === categoryFilter) &&
+    (categoryFilter === 'All' || (categoryFilter === 'Uncategorized' ? !p.category : p.category === categoryFilter)) &&
     (p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   const pendingProducts = products.filter(p => p.status === 'pending' &&
-    (categoryFilter === 'All' || p.category === categoryFilter) &&
+    (categoryFilter === 'All' || (categoryFilter === 'Uncategorized' ? !p.category : p.category === categoryFilter)) &&
     (p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   const pendingCount = products.filter(p => p.status === 'pending').length;
   const displayProducts = activeTab === 'pending' ? pendingProducts : activeProducts;
 
-  const categories = ['All', ...new Set(products.map(p => p.category))].filter(Boolean);
+  const categories = ['All', ...dbCategories.map(c => c.name)];
+  if (products.some(p => !p.category)) {
+    categories.push('Uncategorized');
+  }
 
   return (
     <div className="space-y-8">
