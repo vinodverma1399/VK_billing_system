@@ -50,9 +50,11 @@ const EditInvoice = () => {
         const prods = found.products.map(p => ({
           product: p.product?._id || p.product,
           name: p.product?.name || 'Product',
+          category: p.product?.category || '-',
           price: p.price,
           gst: p.product?.gst ?? 0,
           stock: p.product?.stock ?? 0,
+          unit: p.product?.unit || 'Piece',
           quantity: p.quantity,
           discount: p.discount || 0,
         }));
@@ -99,9 +101,11 @@ const EditInvoice = () => {
         setInvoiceProducts([...invoiceProducts, {
           product: product._id,
           name: product.name,
+          category: product.category,
           price: product.price,
           gst: product.gst,
           stock: product.stock,
+          unit: product.unit || 'Piece',
           quantity: 1,
           discount: 0,
         }]);
@@ -300,6 +304,7 @@ const EditInvoice = () => {
             <table className="w-full text-left text-sm text-gray-600">
               <thead className="bg-gray-50 text-gray-700 uppercase font-bold border-b text-[10px] tracking-widest">
                 <tr>
+                  <th className="px-6 py-4">Category</th>
                   <th className="px-6 py-4">Product</th>
                   <th className="px-6 py-4">Price</th>
                   <th className="px-6 py-4">Qty</th>
@@ -311,20 +316,25 @@ const EditInvoice = () => {
               <tbody>
                 {invoiceProducts.map((item, idx) => (
                   <tr key={idx} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="px-6 py-4 text-gray-500 font-medium">{item.category || '-'}</td>
                     <td className="px-6 py-4 font-bold text-gray-900">{item.name}</td>
                     <td className="px-6 py-4">₹{item.price}</td>
                     <td className="px-6 py-4">
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => updateQuantity(idx, Number(e.target.value))}
-                        className="w-16 px-2 py-1 border border-gray-200 rounded-lg text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={item.quantity}
+                          onChange={(e) => updateQuantity(idx, e.target.value)}
+                          className="w-16 px-2 py-1 border border-gray-200 rounded-lg text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <span className="text-xs text-gray-500 font-bold">{item.unit || 'Piece'}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4">{item.gst}%</td>
                     <td className="px-6 py-4 text-right font-bold">
-                      ₹{((item.price * item.quantity) + (((item.price * item.quantity) * item.gst) / 100)).toFixed(2)}
+                      ₹{((Number(item.price) * Number(item.quantity)) + ((Number(item.price) * Number(item.quantity)) * (Number(item.gst) / 100))).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
@@ -337,7 +347,7 @@ const EditInvoice = () => {
                   </tr>
                 ))}
                 {invoiceProducts.length === 0 && (
-                  <tr><td colSpan="6" className="text-center py-10 text-gray-400 font-medium">No products. Scan a barcode to add.</td></tr>
+                  <tr><td colSpan="7" className="text-center py-10 text-gray-400 font-medium">No products. Scan a barcode to add.</td></tr>
                 )}
               </tbody>
             </table>

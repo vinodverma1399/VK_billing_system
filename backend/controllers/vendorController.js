@@ -1,4 +1,5 @@
 const Vendor = require('../models/Vendor');
+const { logAudit } = require('./auditController');
 
 // @desc    Get all vendors
 // @route   GET /api/vendors
@@ -25,6 +26,16 @@ const createVendor = async (req, res) => {
     }
 
     const vendor = await Vendor.create({ name, mobile, gst, user: req.ownerId });
+
+    await logAudit(
+      'Created Vendor',
+      'Vendor',
+      req.user._id,
+      req.ownerId,
+      vendor._id,
+      `Added new vendor: ${name} (${mobile})`
+    );
+
     res.status(201).json(vendor);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -53,6 +64,15 @@ const updateVendor = async (req, res) => {
     vendor.gst = gst || vendor.gst;
     await vendor.save();
 
+    await logAudit(
+      'Updated Vendor',
+      'Vendor',
+      req.user._id,
+      req.ownerId,
+      vendor._id,
+      `Updated details for vendor: ${vendor.name}`
+    );
+
     res.json(vendor);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -66,6 +86,16 @@ const deleteVendor = async (req, res) => {
   try {
     const vendor = await Vendor.findOneAndDelete({ _id: req.params.id, user: req.ownerId });
     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+    await logAudit(
+      'Deleted Vendor',
+      'Vendor',
+      req.user._id,
+      req.ownerId,
+      req.params.id,
+      `Removed vendor: ${vendor.name}`
+    );
+
     res.json({ message: 'Vendor deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });

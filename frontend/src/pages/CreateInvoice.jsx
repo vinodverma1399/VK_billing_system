@@ -17,6 +17,7 @@ const CreateInvoice = () => {
   const [status, setStatus] = useState('Unpaid');
   const [paymentMethod, setPaymentMethod] = useState('Unpaid'); // Unpaid | Cash | UPI | Partial
   const [amountPaidInput, setAmountPaidInput] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
   const barcodeRef = useRef(null);
@@ -72,9 +73,11 @@ const CreateInvoice = () => {
         setInvoiceProducts([...invoiceProducts, {
           product: product._id,
           name: product.name,
+          category: product.category,
           price: product.price,
           gst: product.gst,
           stock: product.stock,
+          unit: product.unit || 'Piece',
           quantity: 1,
           discount: 0
         }]);
@@ -272,12 +275,24 @@ const CreateInvoice = () => {
         {/* Left Column - Product Scanning & List */}
         <div className="col-span-1 lg:col-span-2 space-y-6">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-accent/10 rounded-2xl flex items-center justify-center text-xl">🔍</div>
-              <div>
-                <h2 className="text-base font-black text-gray-900">Scan / Search Product</h2>
-                <p className="text-xs text-gray-400">Use barcode gun or type product name / barcode</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-accent/10 rounded-2xl flex items-center justify-center text-xl">🔍</div>
+                <div>
+                  <h2 className="text-base font-black text-gray-900">Scan / Search Product</h2>
+                  <p className="text-xs text-gray-400">Use barcode gun or type product name / barcode</p>
+                </div>
               </div>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-bold text-sm text-gray-700"
+              >
+                <option value="All">All Categories</option>
+                {[...new Set(allProducts.map(p => p.category || 'Uncategorized'))].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             <form onSubmit={handleBarcodeScan} className="flex gap-3">
               <div className="flex-1 relative">
@@ -294,9 +309,9 @@ const CreateInvoice = () => {
                   autoFocus
                 />
                 <datalist id="product-list">
-                  {allProducts.filter(p => p.status !== 'pending').map((p) => (
+                  {allProducts.filter(p => p.status !== 'pending' && (selectedCategory === 'All' || p.category === selectedCategory)).map((p) => (
                     <option key={p._id} value={p.barcode || p.name}>
-                      {p.name} {p.barcode ? `[${p.barcode}]` : ''} — ₹{p.price} (Stock: {p.stock})
+                      {p.name} {p.barcode ? `[${p.barcode}]` : ''} — ₹{p.price} / {p.unit || 'Piece'} (Stock: {p.stock})
                     </option>
                   ))}
                 </datalist>
@@ -315,11 +330,14 @@ const CreateInvoice = () => {
             {allProducts.length > 0 && !barcodeInput && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="text-[10px] font-black uppercase text-gray-400 flex items-center">Quick add:</span>
-                {allProducts.filter(p => p.stock > 0 && p.status !== 'pending').slice(0, 6).map(p => (
+                {allProducts
+                  .filter(p => p.stock > 0 && p.status !== 'pending' && (selectedCategory === 'All' || p.category === selectedCategory))
+                  .slice(0, 10)
+                  .map(p => (
                   <button key={p._id} type="button"
                     onClick={() => { setBarcodeInput(p.barcode || p.name); setTimeout(() => barcodeRef.current?.form?.requestSubmit(), 50); }}
                     className="text-xs bg-gray-100 hover:bg-accent hover:text-white text-gray-700 font-bold px-3 py-1.5 rounded-xl transition-all border border-gray-200">
-                    {p.name} — ₹{p.price}
+                    {p.name} — ₹{p.price}/{p.unit || 'Piece'}
                   </button>
                 ))}
               </div>
@@ -333,6 +351,7 @@ const CreateInvoice = () => {
             <table className="w-full text-left text-sm text-gray-600">
               <thead className="bg-gray-50 text-gray-700 uppercase font-semibold border-b">
                 <tr>
+                  <th className="px-6 py-4">Category</th>
                   <th className="px-6 py-4">Product</th>
                   <th className="px-6 py-4">Price</th>
                   <th className="px-6 py-4">Qty</th>
@@ -343,25 +362,30 @@ const CreateInvoice = () => {
               <tbody>
                 {invoiceProducts.map((item, idx) => (
                   <tr key={idx} className="border-b last:border-0">
-                    <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
+                    <td className="px-6 py-4 text-gray-500 font-medium">{item.category || '-'}</td>
+                    <td className="px-6 py-4 font-bold text-gray-900">{item.name}</td>
                     <td className="px-6 py-4">₹{item.price}</td>
                     <td className="px-6 py-4">
-                      <input 
-                        type="number" 
-                        min="1" 
-                        value={item.quantity} 
-                        onChange={(e) => updateQuantity(idx, Number(e.target.value))}
-                        className="w-16 px-2 py-1 border rounded text-center"
-                      />
+                      <div className="flex items-center gap-1">
+                        <input 
+                          type="number" 
+                          min="0"
+                          step="any"
+                          value={item.quantity} 
+                          onChange={(e) => updateQuantity(idx, e.target.value)}
+                          className="w-16 px-2 py-1 border rounded text-center"
+                        />
+                        <span className="text-xs text-gray-500 font-bold">{item.unit || 'Piece'}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4">{item.gst}%</td>
                     <td className="px-6 py-4 text-right font-medium">
-                      ₹{((item.price * item.quantity) + (((item.price * item.quantity) * item.gst) / 100)).toFixed(2)}
+                      ₹{((Number(item.price) * Number(item.quantity)) + ((Number(item.price) * Number(item.quantity)) * (Number(item.gst) / 100))).toFixed(2)}
                     </td>
                   </tr>
                 ))}
                 {invoiceProducts.length === 0 && (
-                  <tr><td colSpan="5" className="text-center py-8 text-gray-500">No products added. Scan barcode to begin.</td></tr>
+                  <tr><td colSpan="6" className="text-center py-8 text-gray-500">No products added. Scan barcode to begin.</td></tr>
                 )}
               </tbody>
             </table>

@@ -82,22 +82,24 @@ export const generateInvoicePDF = (inv) => {
     // Products Table
     const tableRows = (inv.products || []).map(p => {
       const name = p.product?.name || p.name || 'Item';
+      const category = p.product?.category || p.category || '-';
+      const unit = p.product?.unit || p.unit || 'Piece';
       const price = Number(p.price) || 0;
       const qty = Number(p.quantity) || 0;
       const gstPct = p.product?.gst ?? 0;
       const total = Number(p.total) || (qty * price * (1 + gstPct / 100));
-      return [name, qty, `Rs ${price.toLocaleString('en-IN')}`, `${gstPct}%`, `Rs ${total.toLocaleString('en-IN')}`];
+      return [category, name, `${qty} ${unit}`, `Rs ${price.toLocaleString('en-IN')}`, `${gstPct}%`, `Rs ${total.toLocaleString('en-IN')}`];
     });
 
     autoTable(doc, {
       startY: 82,
-      head: [['Item Description', 'Qty', 'Unit Price', 'GST', 'Total']],
+      head: [['Category', 'Product Name', 'Qty', 'Unit Price', 'GST', 'Total']],
       body: tableRows,
       theme: 'grid',
       headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 8, cellPadding: 4 },
-      columnStyles: { 4: { halign: 'right', fontStyle: 'bold' } }
+      columnStyles: { 5: { halign: 'right', fontStyle: 'bold' } }
     });
 
     const finalY = doc.lastAutoTable?.finalY || 82;
@@ -216,17 +218,19 @@ export const printThermal = (inv) => {
       })()}
       <div class="divider"></div>
       <table>
-        <tr><td class="bold">Item</td><td class="bold right">Qty</td><td class="bold right">Rate</td><td class="bold right">Amt</td></tr>
+        <tr><td class="bold">Category</td><td class="bold">Item</td><td class="bold right">Qty</td><td class="bold right">Amt</td></tr>
         <tr><td colspan="4"><div class="divider"></div></td></tr>
         ${(inv.products || []).map(p => {
+    const category = p.product?.category || p.category || '-';
     const name = p.product?.name || p.name || 'Item';
+    const unit = p.product?.unit || p.unit || 'Pc';
     const qty = Number(p.quantity) || 0;
     const price = Number(p.price) || 0;
     const total = Number(p.total) || (qty * price);
     return `<tr>
+            <td class="item-name">${category}</td>
             <td class="item-name">${name}</td>
-            <td class="right">${qty}</td>
-            <td class="right">${price}</td>
+            <td class="right">${qty} ${unit}</td>
             <td class="right">${total.toFixed(0)}</td>
           </tr>`;
   }).join('')}
@@ -382,17 +386,19 @@ export const printReturnThermal = (ret) => {
       ${ret.createdBy?.name ? `<div class="row"><span>Processed By:</span><span class="bold">${ret.createdBy.name}</span></div>` : (shop.staffName ? `<div class="row"><span>Processed By:</span><span class="bold">${shop.staffName}</span></div>` : '')}
       <div class="divider"></div>
       <table>
-        <tr><td class="bold">Item</td><td class="bold right">Qty</td><td class="bold right">Condition</td><td class="bold right">Refund</td></tr>
+        <tr><td class="bold">Category</td><td class="bold">Item</td><td class="bold right">Qty</td><td class="bold right">Refund</td></tr>
         <tr><td colspan="4"><div class="divider"></div></td></tr>
         ${(ret.returnedProducts || []).map(rp => {
+    const category = rp.product?.category || '-';
     const name = rp.productName || rp.product?.name || 'Item';
+    const unit = rp.product?.unit || 'Pc';
     const qty = Number(rp.quantity) || 0;
     const cond = rp.condition === 'Defective' ? 'Defect' : 'Good';
     const refund = Number(rp.refundAmount) || 0;
     return `<tr>
-            <td class="item-name">${name}</td>
-            <td class="right">${qty}</td>
-            <td class="right">${cond}</td>
+            <td>${category}</td>
+            <td class="item-name">${name}<br/><small>(${cond})</small></td>
+            <td class="right">${qty} ${unit}</td>
             <td class="right">${refund.toFixed(0)}</td>
           </tr>`;
   }).join('')}

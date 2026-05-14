@@ -201,8 +201,9 @@ const Returns = () => {
                       <div className="space-y-1">
                         {ret.returnedProducts.map((rp, i) => (
                           <div key={i} className="text-xs font-bold text-gray-700">
-                            {rp.productName || rp.product?.name || 'Product'} ×{rp.quantity}
-                            <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-black ${rp.condition === 'Defective' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                            {rp.product?.category ? <span className="text-gray-400 text-[10px] mr-1 uppercase">[{rp.product.category}]</span> : null}
+                            {rp.productName || rp.product?.name || 'Product'} ×{rp.quantity} {rp.product?.unit || 'Piece'}
+                            <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-black ${rp.condition === 'Defective' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                               {rp.condition === 'Defective' ? '⚠️ Defective' : '✓ Good'}
                             </span>
                           </div>
@@ -315,6 +316,8 @@ const Returns = () => {
                     {invoiceDetails.products.map((item, i) => {
                       const pId = item.product?._id || item.product;
                       const pName = item.product?.name || 'Product';
+                      const pCat = item.product?.category;
+                      const pUnit = item.product?.unit || 'Piece';
                       const alreadyReturned = item.returnedQty || 0;
                       const maxR = item.quantity - alreadyReturned;
                       const curQty = selectedItems[pId]?.qty || 0;
@@ -324,8 +327,12 @@ const Returns = () => {
                         <div key={i} className={`p-4 rounded-2xl border transition-all ${fullyDone ? 'border-gray-200 bg-gray-100 opacity-60' : curQty > 0 ? 'border-orange-300 bg-orange-50' : 'border-gray-100 bg-gray-50'}`}>
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <div className="font-black text-gray-900">{pName}{fullyDone && <span className="ml-2 text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-lg font-black">Fully Returned</span>}</div>
-                              <div className="text-xs text-gray-500 font-medium">Purchased: {item.quantity} · Returned: <span className={alreadyReturned > 0 ? 'text-orange-600 font-bold' : ''}>{alreadyReturned}</span> · Returnable: <span className="font-bold text-emerald-600">{maxR}</span></div>
+                              <div className="font-black text-gray-900">
+                                {pCat ? <span className="text-gray-400 text-[10px] mr-1 uppercase">[{pCat}]</span> : null}
+                                {pName}
+                                {fullyDone && <span className="ml-2 text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-lg font-black">Fully Returned</span>}
+                              </div>
+                              <div className="text-xs text-gray-500 font-medium">Purchased: {item.quantity} {pUnit} · Returned: <span className={alreadyReturned > 0 ? 'text-orange-600 font-bold' : ''}>{alreadyReturned} {pUnit}</span> · Returnable: <span className="font-bold text-emerald-600">{maxR} {pUnit}</span></div>
                             </div>
                             {!fullyDone && (
                               <div className="flex items-center gap-2 ml-4">

@@ -1,4 +1,5 @@
 const Expense = require('../models/Expense');
+const { logAudit } = require('./auditController');
 
 const getExpenses = async (req, res) => {
   try {
@@ -24,6 +25,16 @@ const createExpense = async (req, res) => {
       date: date ? new Date(date) : new Date(),
       user: req.ownerId
     });
+
+    await logAudit(
+      'Created Expense',
+      'Expense',
+      req.user._id,
+      req.ownerId,
+      expense._id,
+      `New expense: ${title} for ₹${amount}`
+    );
+
     res.status(201).json(expense);
   } catch (e) { res.status(500).json({ message: e.message }); }
 };
@@ -40,6 +51,16 @@ const updateExpense = async (req, res) => {
     if (note !== undefined) expense.note = note;
     if (date) expense.date = new Date(date);
     await expense.save();
+
+    await logAudit(
+      'Updated Expense',
+      'Expense',
+      req.user._id,
+      req.ownerId,
+      expense._id,
+      `Updated expense details for: ${expense.title}`
+    );
+
     res.json(expense);
   } catch (e) { res.status(500).json({ message: e.message }); }
 };
@@ -48,6 +69,16 @@ const deleteExpense = async (req, res) => {
   try {
     const expense = await Expense.findOneAndDelete({ _id: req.params.id, user: req.ownerId });
     if (!expense) return res.status(404).json({ message: 'Expense not found' });
+
+    await logAudit(
+      'Deleted Expense',
+      'Expense',
+      req.user._id,
+      req.ownerId,
+      req.params.id,
+      `Removed expense: ${expense.title}`
+    );
+
     res.json({ message: 'Deleted' });
   } catch (e) { res.status(500).json({ message: e.message }); }
 };

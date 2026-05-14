@@ -87,7 +87,7 @@ const createInvoice = async (req, res) => {
     // Populate details for the frontend (especially for the PDF)
     await invoice.populate([
       { path: 'customer', select: 'name mobile' },
-      { path: 'products.product', select: 'name barcode gst stock' }
+      { path: 'products.product', select: 'name barcode gst stock category unit' }
     ]);
 
     // Emit event
@@ -122,7 +122,7 @@ const getInvoices = async (req, res) => {
     const invoices = await Invoice.find(query)
       .populate('customer', 'name mobile')
       .populate('createdBy', 'name role')
-      .populate('products.product', 'name barcode gst stock')
+      .populate('products.product', 'name barcode gst stock category unit')
       .sort({ createdAt: -1 });
     res.json(invoices);
   } catch (error) {
@@ -138,7 +138,7 @@ const getShopInvoices = async (req, res) => {
     const invoices = await Invoice.find({ user: req.ownerId })
       .populate('customer', 'name mobile')
       .populate('createdBy', 'name role')
-      .populate('products.product', 'name barcode gst stock')
+      .populate('products.product', 'name barcode gst stock category unit')
       .sort({ createdAt: -1 });
     res.json(invoices);
   } catch (error) {
@@ -170,6 +170,16 @@ const cancelInvoice = async (req, res) => {
 
     invoice.status = 'Cancelled';
     await invoice.save();
+
+    await logAudit(
+      'Cancelled Invoice',
+      'Invoice',
+      req.user._id,
+      req.ownerId,
+      invoice._id,
+      `Cancelled invoice ${invoice.invoiceNumber}`
+    );
+
     res.json({ message: 'Invoice cancelled successfully', invoice });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -195,6 +205,16 @@ const updateInvoiceStatus = async (req, res) => {
 
     invoice.status = status;
     await invoice.save();
+
+    await logAudit(
+      'Updated Payment Status',
+      'Invoice',
+      req.user._id,
+      req.ownerId,
+      invoice._id,
+      `Changed status of ${invoice.invoiceNumber} to ${status}`
+    );
+
     res.json(invoice);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -290,8 +310,17 @@ const updateInvoice = async (req, res) => {
     await invoice.save();
     await invoice.populate([
       { path: 'customer', select: 'name mobile' },
-      { path: 'products.product', select: 'name barcode gst stock' }
+      { path: 'products.product', select: 'name barcode gst stock category unit' }
     ]);
+
+    await logAudit(
+      'Updated Invoice',
+      'Invoice',
+      req.user._id,
+      req.ownerId,
+      invoice._id,
+      `Modified items/details in invoice ${invoice.invoiceNumber}`
+    );
 
     res.json(invoice);
   } catch (error) {
@@ -324,6 +353,16 @@ const addPayment = async (req, res) => {
 
     await invoice.save();
     await invoice.populate('customer', 'name mobile');
+
+    await logAudit(
+      'Added Payment',
+      'Invoice',
+      req.user._id,
+      req.ownerId,
+      invoice._id,
+      `Recorded payment of ₹${amount} for invoice ${invoice.invoiceNumber}`
+    );
+
     res.json(invoice);
   } catch (error) {
     res.status(500).json({ message: error.message });

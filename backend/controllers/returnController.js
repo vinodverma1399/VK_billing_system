@@ -1,6 +1,7 @@
 const Return = require('../models/Return');
 const Invoice = require('../models/Invoice');
 const Product = require('../models/Product');
+const { logAudit } = require('./auditController');
 
 // @desc    Get all returns for logged-in user
 // @route   GET /api/returns
@@ -15,7 +16,7 @@ const getReturns = async (req, res) => {
       .populate('invoice', 'invoiceNumber finalAmount createdAt status')
       .populate('createdBy', 'name')
       .populate('customer', 'name mobile')
-      .populate('returnedProducts.product', 'name barcode')
+      .populate('returnedProducts.product', 'name barcode category unit')
       .sort({ createdAt: -1 });
     res.json(returns);
   } catch (error) {
@@ -117,10 +118,19 @@ const createReturn = async (req, res) => {
     await newReturn.populate([
       { path: 'invoice', select: 'invoiceNumber finalAmount createdAt' },
       { path: 'customer', select: 'name mobile' },
-      { path: 'returnedProducts.product', select: 'name barcode' }
+      { path: 'returnedProducts.product', select: 'name barcode category unit' }
     ]);
 
     res.status(201).json(newReturn);
+
+    await logAudit(
+      'Created Return Request',
+      'Return',
+      req.user._id,
+      req.ownerId,
+      newReturn._id,
+      `Requested return for invoice ${invoice.invoiceNumber}. Total Refund: ₹${totalRefund}`
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -192,10 +202,19 @@ const updateReturnStatus = async (req, res) => {
     await returnDoc.populate([
       { path: 'invoice', select: 'invoiceNumber finalAmount createdAt' },
       { path: 'customer', select: 'name mobile' },
-      { path: 'returnedProducts.product', select: 'name barcode' }
+      { path: 'returnedProducts.product', select: 'name barcode category unit' }
     ]);
 
     res.json(returnDoc);
+
+    await logAudit(
+      `${status} Return`,
+      'Return',
+      req.user._id,
+      req.ownerId,
+      returnDoc._id,
+      `${status} return request from #${returnDoc._id.toString().substring(18).toUpperCase()}`
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

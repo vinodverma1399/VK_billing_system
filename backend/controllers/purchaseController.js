@@ -1,6 +1,7 @@
 const Purchase = require('../models/Purchase');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
+const { logAudit } = require('./auditController');
 
 // @desc    Get all purchases
 // @route   GET /api/purchases
@@ -14,7 +15,7 @@ const getPurchases = async (req, res) => {
     const purchases = await Purchase.find(query)
       .populate('vendor', 'name mobile')
       .populate('createdBy', 'name')
-      .populate('products.product', 'name barcode')
+      .populate('products.product', 'name barcode category unit')
       .sort({ purchaseDate: -1 });
     res.json(purchases);
   } catch (error) {
@@ -72,6 +73,15 @@ const createPurchase = async (req, res) => {
     });
 
     res.status(201).json(purchase);
+
+    await logAudit(
+      'Stock Entry',
+      'Stock',
+      req.user._id,
+      req.ownerId,
+      purchase._id,
+      `New stock entry for ₹${totalCost} from vendor ${vendorId}`
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -108,6 +118,16 @@ const updatePurchaseStatus = async (req, res) => {
     purchase.status = purchase.amountPaid >= purchase.totalCost ? 'Paid' : 'Pending';
 
     await purchase.save();
+
+    await logAudit(
+      'Vendor Payment',
+      'Stock',
+      req.user._id,
+      req.ownerId,
+      purchase._id,
+      `Paid ₹${payAmount} to vendor for purchase #${purchase._id.toString().substring(18).toUpperCase()}`
+    );
+
     res.json(purchase);
   } catch (error) {
     res.status(500).json({ message: error.message });

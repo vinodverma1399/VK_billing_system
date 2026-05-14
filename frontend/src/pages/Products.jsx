@@ -19,12 +19,16 @@ const Modal = ({ title, onClose, children }) => (
 
 const Products = () => {
   const [products, setProducts] = useState([]);
+  const [dbCategories, setDbCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [editProduct, setEditProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'pending'
-  const [form, setForm] = useState({ name: '', price: '', gst: '0', barcode: '', stock: '0', costPrice: '0', lowStockThreshold: '5' });
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [form, setForm] = useState({ name: '', category: '', unit: 'Piece', price: '', gst: '0', barcode: '', stock: '0', costPrice: '0', lowStockThreshold: '5' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [approvingId, setApprovingId] = useState(null);
@@ -34,7 +38,10 @@ const Products = () => {
 
   const getConfig = () => ({ headers: { Authorization: `Bearer ${userInfo.token}` } });
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { 
+    fetchProducts(); 
+    fetchCategories();
+  }, []);
 
   async function fetchProducts() {
     try {
@@ -47,16 +54,48 @@ const Products = () => {
     }
   }
 
+  async function fetchCategories() {
+    try {
+      const { data } = await axios.get(`${API}/categories`, getConfig());
+      setDbCategories(data);
+    } catch (err) {
+      console.error('Error fetching categories', err);
+    }
+  }
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    try {
+      const { data } = await axios.post(`${API}/categories`, { name: newCategoryName }, getConfig());
+      setDbCategories([...dbCategories, data]);
+      setNewCategoryName('');
+      if (form.category === '') setForm({ ...form, category: data.name });
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create category');
+    }
+  };
+
+  const handleDeleteCategory = async (id) => {
+    if (!window.confirm('Delete this category?')) return;
+    try {
+      await axios.delete(`${API}/categories/${id}`, getConfig());
+      setDbCategories(dbCategories.filter(c => c._id !== id));
+    } catch (err) {
+      alert('Failed to delete category');
+    }
+  };
+
   const openAdd = () => {
     setEditProduct(null);
-    setForm({ name: '', price: '', gst: '0', barcode: '', stock: '0', costPrice: '0', lowStockThreshold: '5' });
+    setForm({ name: '', category: dbCategories.length > 0 ? dbCategories[0].name : '', unit: 'Piece', price: '', gst: '0', barcode: '', stock: '0', costPrice: '0', lowStockThreshold: '5' });
     setError('');
     setShowModal(true);
   };
 
   const openEdit = (p) => {
     setEditProduct(p);
-    setForm({ name: p.name, price: p.price, gst: p.gst, barcode: p.barcode || '', stock: p.stock, costPrice: p.costPrice || '0', lowStockThreshold: p.lowStockThreshold ?? 5 });
+    setForm({ name: p.name, category: p.category || (dbCategories.length > 0 ? dbCategories[0].name : ''), unit: p.unit || 'Piece', price: p.price, gst: p.gst, barcode: p.barcode || '', stock: p.stock, costPrice: p.costPrice || '0', lowStockThreshold: p.lowStockThreshold ?? 5 });
     setError('');
     setShowModal(true);
   };
@@ -86,10 +125,13 @@ const Products = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!form.name || !form.price) return setError('Name and Price are required');
+    if (!form.category) return setError('Please select a Category. Create one if none exist.');
     setSaving(true);
     try {
       const payload = {
         name: form.name,
+        category: form.category,
+        unit: form.unit,
         price: Number(form.price),
         gst: Number(form.gst) || 0,
         barcode: form.barcode,
@@ -113,13 +155,17 @@ const Products = () => {
   };
 
   const activeProducts = products.filter(p => p.status === 'active' &&
+    (categoryFilter === 'All' || p.category === categoryFilter) &&
     (p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   const pendingProducts = products.filter(p => p.status === 'pending' &&
+    (categoryFilter === 'All' || p.category === categoryFilter) &&
     (p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   const pendingCount = products.filter(p => p.status === 'pending').length;
   const displayProducts = activeTab === 'pending' ? pendingProducts : activeProducts;
+
+  const categories = ['All', ...new Set(products.map(p => p.category))].filter(Boolean);
 
   return (
     <div className="space-y-8">
@@ -129,6 +175,12 @@ const Products = () => {
           <p className="text-gray-500 font-medium">Manage your products and stock levels</p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className="px-5 py-3 bg-purple-50 text-purple-700 rounded-2xl font-bold hover:bg-purple-100 transition text-sm border border-purple-200"
+          >
+            🏷️ Manage Categories
+          </button>
           <button onClick={() => exportProductsCSV(products)} className="px-5 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition text-sm">
             ⬇️ Export CSV
           </button>
@@ -160,15 +212,26 @@ const Products = () => {
         </button>
       </div>
 
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search by name or barcode..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-12 pr-4 py-4 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-4 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
-        />
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl grayscale opacity-50">🔍</span>
+      <div className="flex gap-4 items-center">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Search by name or barcode..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-12 pr-4 py-4 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-4 focus:ring-accent/10 focus:border-accent outline-none transition-all font-medium"
+          />
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl grayscale opacity-50">🔍</span>
+        </div>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="px-4 py-4 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-4 focus:ring-accent/10 focus:border-accent outline-none transition-all font-bold text-gray-700 w-48"
+        >
+          {categories.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </div>
 
       {/* Pending hint for Staff */}
@@ -184,6 +247,7 @@ const Products = () => {
             <thead className="bg-gray-50/50 text-gray-500 uppercase text-[10px] font-black tracking-widest border-b">
               <tr>
                 <th className="px-8 py-5">Product Details</th>
+                <th className="px-8 py-5">Category</th>
                 <th className="px-8 py-5">Barcode</th>
                 <th className="px-8 py-5">Price & Tax</th>
                 <th className="px-8 py-5">Stock</th>
@@ -212,6 +276,11 @@ const Products = () => {
                       </div>
                     </td>
                     <td className="px-8 py-6">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {p.category || 'No Category'}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6">
                       <span className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-mono text-xs font-bold border border-gray-200">
                         {p.barcode || 'NO BARCODE'}
                       </span>
@@ -224,7 +293,7 @@ const Products = () => {
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${p.stock > 10 ? 'bg-success' : p.stock > 0 ? 'bg-yellow-400' : 'bg-red-500'}`}></div>
                         <span className={`text-sm font-black ${p.stock > 10 ? 'text-success' : p.stock > 0 ? 'text-yellow-600' : 'text-red-500'}`}>
-                          {p.stock} units
+                          {p.stock} {p.unit || 'Piece'}
                         </span>
                       </div>
                     </td>
@@ -244,7 +313,8 @@ const Products = () => {
                           >
                             {approvingId === p._id ? '...' : '✅ Approve'}
                           </button>
-                          <button onClick={() => handleDelete(p._id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition">🗑️</button>
+                          <button onClick={() => openEdit(p)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition" title="Edit before approving">✏️</button>
+                          <button onClick={() => handleDelete(p._id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition" title="Delete">🗑️</button>
                         </div>
                       ) : p.status === 'pending' && userRole === 'Staff' ? (
                         <span className="text-[10px] text-amber-500 font-bold italic">Awaiting approval</span>
@@ -275,16 +345,57 @@ const Products = () => {
           <form onSubmit={handleSave} className="space-y-6">
             {error && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-bold border border-red-100">{error}</div>}
 
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Product Name</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold"
+                  placeholder="Product title..."
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Category *</label>
+                <div className="flex gap-2">
+                  <select
+                    value={form.category}
+                    onChange={e => setForm({ ...form, category: e.target.value })}
+                    className="flex-1 px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold text-gray-700"
+                    required
+                  >
+                    {dbCategories.length === 0 ? (
+                       <option value="">No Categories Found</option>
+                    ) : (
+                      <>
+                        <option value="" disabled>Select a Category...</option>
+                        {dbCategories.map(c => (
+                          <option key={c._id} value={c.name}>{c.name}</option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                  <button type="button" onClick={() => setShowCategoryModal(true)} className="px-4 bg-purple-50 text-purple-600 rounded-2xl font-bold hover:bg-purple-100 border border-purple-200" title="Manage Categories">
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-1">
-              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Product Name</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold"
-                placeholder="Product title..."
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Unit of Measurement *</label>
+              <select
+                value={form.unit}
+                onChange={e => setForm({ ...form, unit: e.target.value })}
+                className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold text-gray-700"
                 required
-              />
+              >
+                {['Piece', 'Meter', 'Liter', 'Kg', 'ML', 'Gm', 'Number', 'Pack', 'Box', 'Dozen'].map(u => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
@@ -341,6 +452,45 @@ const Products = () => {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {showCategoryModal && (
+        <Modal title="🏷️ Manage Categories" onClose={() => setShowCategoryModal(false)}>
+          <form onSubmit={handleCreateCategory} className="mb-6 flex gap-3">
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={e => setNewCategoryName(e.target.value)}
+              className="flex-1 px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all outline-none font-bold"
+              placeholder="New Category Name..."
+              required
+            />
+            <button type="submit" className="px-6 py-3 bg-purple-600 text-white rounded-2xl font-black shadow-lg shadow-purple-600/20 hover:bg-purple-700 active:scale-95 transition-all">
+              Add
+            </button>
+          </form>
+
+          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+            {dbCategories.length === 0 ? (
+              <div className="p-6 text-center text-gray-400 font-bold">No categories added yet.</div>
+            ) : (
+              <ul className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                {dbCategories.map(c => (
+                  <li key={c._id} className="p-4 flex justify-between items-center hover:bg-gray-50">
+                    <span className="font-bold text-gray-800">{c.name}</span>
+                    <button 
+                      onClick={() => handleDeleteCategory(c._id)} 
+                      className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition"
+                      title="Delete Category"
+                    >
+                      🗑️
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </Modal>
       )}
     </div>

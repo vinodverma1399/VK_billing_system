@@ -25,11 +25,18 @@ const StockEntry = () => {
   // Form State
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [selectedVendor, setSelectedVendor] = useState('');
-  const [items, setItems] = useState([{ product: '', quantity: 1, purchasePrice: 0 }]);
+  const [items, setItems] = useState([{ category: '', product: '', quantity: 1, purchasePrice: 0 }]);
   const [amountPaid, setAmountPaid] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Quick Add Product State
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productSaving, setProductSaving] = useState(false);
+  const [productError, setProductError] = useState('');
+  const [newProductForm, setNewProductForm] = useState({ name: '', category: '', unit: 'Piece', price: '', gst: '0', barcode: '', costPrice: '0' });
 
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
   const userRole = userInfo.role || 'Admin';
@@ -56,19 +63,21 @@ const StockEntry = () => {
 
   async function fetchInitialData() {
     try {
-      const [vRes, pRes] = await Promise.all([
+      const [vRes, pRes, cRes] = await Promise.all([
         axios.get(`${API}/vendors`, getConfig()),
-        axios.get(`${API}/products`, getConfig())
+        axios.get(`${API}/products`, getConfig()),
+        axios.get(`${API}/categories`, getConfig())
       ]);
       setVendors(vRes.data);
       setProducts(pRes.data);
+      setCategories(cRes.data);
     } catch (err) {
       console.error('Error fetching initial data', err);
     }
   };
 
   const addItem = () => {
-    setItems([...items, { product: '', quantity: 1, purchasePrice: 0 }]);
+    setItems([...items, { category: '', product: '', quantity: 1, purchasePrice: 0 }]);
   };
 
   const removeItem = (index) => {
@@ -99,7 +108,7 @@ const StockEntry = () => {
       setShowModal(false);
       // Reset form immediately
       setSelectedVendor('');
-      setItems([{ product: '', quantity: 1, purchasePrice: 0 }]);
+      setItems([{ category: '', product: '', quantity: 1, purchasePrice: 0 }]);
       setAmountPaid('');
       setError('');
       
@@ -112,6 +121,35 @@ const StockEntry = () => {
     }
   };
 
+  const handleQuickAddProduct = async (e) => {
+    e.preventDefault();
+    setProductSaving(true);
+    setProductError('');
+    try {
+      const payload = {
+        name: newProductForm.name,
+        category: newProductForm.category || (categories.length > 0 ? categories[0].name : ''),
+        unit: newProductForm.unit,
+        price: Number(newProductForm.price),
+        gst: Number(newProductForm.gst),
+        barcode: newProductForm.barcode,
+        stock: 0,
+        costPrice: Number(newProductForm.costPrice),
+        lowStockThreshold: 5
+      };
+      
+      const { data } = await axios.post(`${API}/products`, payload, getConfig());
+      
+      setProducts(prev => [...prev, data]);
+      setShowProductModal(false);
+      setNewProductForm({ name: '', category: categories.length > 0 ? categories[0].name : '', unit: 'Piece', price: '', gst: '0', barcode: '', costPrice: '0' });
+      alert("Product added successfully! You can now select it from the dropdown.");
+    } catch (err) {
+      setProductError(err.response?.data?.message || 'Error adding product');
+    } finally {
+      setProductSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -160,9 +198,12 @@ const StockEntry = () => {
                     <div className="space-y-2">
                       {p.products.map((item, idx) => (
                         <div key={idx} className="flex justify-between gap-8 text-xs border-b border-gray-50 pb-1 last:border-0">
-                          <span className="text-gray-700 font-medium">{item.product?.name}</span>
+                          <span className="text-gray-700 font-medium">
+                            <span className="text-gray-400 text-[10px] mr-1 uppercase">{item.product?.category || '-'}</span>
+                            {item.product?.name}
+                          </span>
                           <span className="text-gray-500">
-                            {item.quantity} x ₹{item.purchasePrice?.toLocaleString()} = 
+                            {item.quantity} {item.product?.unit || 'Piece'} x ₹{item.purchasePrice?.toLocaleString()} = 
                             <span className="text-gray-900 font-bold ml-1">₹{item.total?.toLocaleString()}</span>
                           </span>
                         </div>
@@ -234,9 +275,28 @@ const StockEntry = () => {
                   
                   {items.map((item, index) => (
                     <div key={index} className="flex flex-col gap-4 bg-gray-50/50 p-6 rounded-3xl border border-gray-100 relative group animate-in slide-in-from-right-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr_1.5fr] gap-4">
                         <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Product</label>
+                          <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Filter Category</label>
+                          <select
+                            value={item.category}
+                            onChange={e => {
+                              updateItem(index, 'category', e.target.value);
+                              updateItem(index, 'product', ''); // Reset product on category change
+                            }}
+                            className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-accent/5 focus:border-accent"
+                          >
+                            <option value="">All Categories...</option>
+                            {categories.map(c => (
+                              <option key={c._id} value={c.name}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Product</label>
+                            <button type="button" onClick={() => { setNewProductForm({...newProductForm, category: item.category || (categories[0]?.name || '')}); setShowProductModal(true); }} className="text-[10px] text-accent font-black hover:underline tracking-tighter uppercase">+ New Product</button>
+                          </div>
                           <select
                             value={item.product}
                             onChange={e => updateItem(index, 'product', e.target.value)}
@@ -244,8 +304,12 @@ const StockEntry = () => {
                             required
                           >
                             <option value="">Select product...</option>
-                            {products.map(p => (
-                              <option key={p._id} value={p._id}>{p.name} (Stock: {p.stock})</option>
+                            {products
+                              .filter(p => !item.category || p.category === item.category)
+                              .map(p => (
+                              <option key={p._id} value={p._id}>
+                                {p.category ? `[${p.category}] ` : ''}{p.name} (Stock: {p.stock} {p.unit || 'Piece'})
+                              </option>
                             ))}
                           </select>
                         </div>
@@ -254,10 +318,11 @@ const StockEntry = () => {
                             <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Quantity</label>
                             <input
                               type="number"
+                              step="any"
                               value={item.quantity}
-                              onChange={e => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                              onChange={e => updateItem(index, 'quantity', e.target.value)}
                               className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-accent/5 focus:border-accent"
-                              min="1"
+                              min="0"
                               required
                             />
                           </div>
@@ -265,8 +330,9 @@ const StockEntry = () => {
                             <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest">Buy Price</label>
                             <input
                               type="number"
+                              step="any"
                               value={item.purchasePrice}
-                              onChange={e => updateItem(index, 'purchasePrice', parseFloat(e.target.value) || 0)}
+                              onChange={e => updateItem(index, 'purchasePrice', e.target.value)}
                               className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-accent/5 focus:border-accent"
                               placeholder="0.00"
                               required
@@ -275,7 +341,7 @@ const StockEntry = () => {
                         </div>
                       </div>
                       <div className="flex justify-between items-center pt-2">
-                        <div className="text-[10px] font-black uppercase text-gray-300">Item Total: <span className="text-gray-900 ml-1">₹{(item.quantity * item.purchasePrice).toLocaleString()}</span></div>
+                        <div className="text-[10px] font-black uppercase text-gray-300">Item Total: <span className="text-gray-900 ml-1">₹{(Number(item.quantity) * Number(item.purchasePrice)).toLocaleString()}</span></div>
                         {items.length > 1 && (
                           <button 
                             type="button" 
@@ -293,7 +359,7 @@ const StockEntry = () => {
                 <div className="flex flex-col sm:flex-row justify-between items-center py-6 px-6 bg-gray-900 rounded-[2rem] text-white shadow-2xl shadow-gray-200 gap-6">
                   <div className="space-y-1 w-full sm:w-auto">
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total Purchase Value</p>
-                    <p className="text-3xl font-black tracking-tighter text-blue-400">₹{items.reduce((acc, curr) => acc + (curr.quantity * curr.purchasePrice), 0).toLocaleString()}</p>
+                    <p className="text-3xl font-black tracking-tighter text-blue-400">₹{items.reduce((acc, curr) => acc + (Number(curr.quantity) * Number(curr.purchasePrice)), 0).toLocaleString()}</p>
                     <p className="text-xs text-gray-400 mt-1">{items.length} Product Types</p>
                   </div>
                   {userRole === 'Admin' ? (
@@ -334,6 +400,112 @@ const StockEntry = () => {
                 </div>
               </>
             )}
+          </form>
+        </Modal>
+      )}
+
+      {showProductModal && (
+        <Modal title="📦 Quick Add New Product" onClose={() => setShowProductModal(false)}>
+          <form onSubmit={handleQuickAddProduct} className="space-y-6">
+            {productError && <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-bold border border-red-100">{productError}</div>}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Product Name *</label>
+                <input
+                  type="text"
+                  value={newProductForm.name}
+                  onChange={e => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold text-gray-700"
+                  placeholder="e.g. Rice 1Kg Pack"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Category *</label>
+                <select
+                  value={newProductForm.category}
+                  onChange={e => setNewProductForm({ ...newProductForm, category: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold text-gray-700"
+                  required
+                >
+                  <option value="">Select Category</option>
+                  {categories.map(c => (
+                    <option key={c._id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Unit *</label>
+                <select
+                  value={newProductForm.unit}
+                  onChange={e => setNewProductForm({ ...newProductForm, unit: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold text-gray-700"
+                  required
+                >
+                  {['Piece', 'Meter', 'Liter', 'Kg', 'ML', 'Gm', 'Number', 'Pack', 'Box', 'Dozen'].map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Selling Price (₹) *</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={newProductForm.price}
+                  onChange={e => setNewProductForm({ ...newProductForm, price: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold text-gray-700"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">GST %</label>
+                <select
+                  value={newProductForm.gst}
+                  onChange={e => setNewProductForm({ ...newProductForm, gst: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold text-gray-700"
+                >
+                  <option value="0">0%</option>
+                  <option value="5">5%</option>
+                  <option value="12">12%</option>
+                  <option value="18">18%</option>
+                  <option value="28">28%</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Barcode (Optional)</label>
+                <input
+                  type="text"
+                  value={newProductForm.barcode}
+                  onChange={e => setNewProductForm({ ...newProductForm, barcode: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-bold text-gray-700"
+                  placeholder="Scan or type barcode"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button 
+                type="button" 
+                onClick={() => setShowProductModal(false)}
+                className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-2xl transition"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={productSaving}
+                className="flex-[2] py-4 bg-accent text-white font-black rounded-2xl hover:shadow-xl hover:shadow-accent/20 active:scale-95 disabled:opacity-50 transition-all"
+              >
+                {productSaving ? 'Saving...' : 'Save Product to Inventory'}
+              </button>
+            </div>
           </form>
         </Modal>
       )}

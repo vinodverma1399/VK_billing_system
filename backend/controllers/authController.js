@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { logAudit } = require('./auditController');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -141,6 +142,15 @@ const updateProfile = async (req, res) => {
       { $set: { shopName: user.shopName, shopAddress: user.shopAddress, shopPhone: user.shopPhone, shopGst: user.shopGst, upiId: user.upiId } }
     );
 
+    await logAudit(
+      'Updated Profile',
+      'Account',
+      user._id,
+      user._id,
+      user._id,
+      `Updated profile/shop details for ${user.shopName || user.name}`
+    );
+
     res.json({
       _id: user._id,
       name: user.name,
@@ -185,6 +195,15 @@ const createStaff = async (req, res) => {
     });
     
     res.status(201).json({ _id: staff._id, name: staff.name, email: staff.email, role: staff.role });
+
+    await logAudit(
+      'Created Staff',
+      'Staff',
+      req.user._id,
+      req.user._id,
+      staff._id,
+      `Created new staff account: ${name} (${email})`
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -204,6 +223,16 @@ const updateStaff = async (req, res) => {
     if (password) staff.password = password;
 
     const updated = await staff.save();
+
+    await logAudit(
+      'Updated Staff',
+      'Staff',
+      req.user._id,
+      req.user._id,
+      updated._id,
+      `Updated details for staff member: ${updated.name}`
+    );
+
     res.json({ _id: updated._id, name: updated.name, email: updated.email });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -218,6 +247,16 @@ const deleteStaff = async (req, res) => {
     const staff = await User.findOne({ _id: req.params.id, ownerId: req.user._id });
     if (!staff) return res.status(404).json({ message: 'Staff not found' });
     await staff.deleteOne();
+
+    await logAudit(
+      'Deleted Staff',
+      'Staff',
+      req.user._id,
+      req.user._id,
+      req.params.id,
+      `Removed staff account: ${staff.name}`
+    );
+
     res.json({ message: 'Staff removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
