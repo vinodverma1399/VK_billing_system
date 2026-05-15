@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API } from '../utils/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { generatePLReport } from '../utils/pdfGenerator';
@@ -42,7 +43,7 @@ const Reports = () => {
       }
 
       const buildUrl = (path) => {
-        let url = `http://localhost:5000/api/reports/${path}`;
+        let url = `${API}/reports/${path}`;
         url += url.includes('?') ? '&' : '?';
         if (queryStart) url += `startDate=${queryStart}&`;
         if (queryEnd) url += `endDate=${queryEnd}`;
