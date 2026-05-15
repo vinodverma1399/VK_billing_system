@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API } from '../utils/api';
 import { printReturnThermal } from '../utils/pdfGenerator';
 
 const REASON_OPTIONS = ['Defective / Damaged Product','Wrong Product Delivered','Customer Changed Mind','Size / Fit Issue','Quality Not Satisfactory','Other'];
@@ -42,10 +43,10 @@ const Returns = () => {
   async function fetchData() {
     try {
       const [retRes, invRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/returns', getConfig()),
+        axios.get(`${API}/returns`, getConfig()),
         // /shop-all: returns ALL shop invoices so any staff can process a return
         // for a bill created by another staff member
-        axios.get('http://localhost:5000/api/invoices/shop-all', getConfig()),
+        axios.get(`${API}/invoices/shop-all`, getConfig()),
       ]);
       setReturns(retRes.data);
       setInvoices(invRes.data.filter(inv => inv.status !== 'Cancelled'));
@@ -103,9 +104,9 @@ const Returns = () => {
     if (itemsToReturn.length === 0) return setFormError('Select at least one product with quantity > 0');
     setSubmitting(true); setFormError('');
     try {
-      const { data } = await axios.post('http://localhost:5000/api/returns', { invoiceId: selectedInvoice, returnedProducts: itemsToReturn, reason }, getConfig());
+      const { data } = await axios.post(`${API}/returns`, { invoiceId: selectedInvoice, returnedProducts: itemsToReturn, reason }, getConfig());
       setReturns(prev => [data, ...prev]);
-      const { data: fresh } = await axios.get('http://localhost:5000/api/invoices', getConfig());
+      const { data: fresh } = await axios.get(`${API}/invoices`, getConfig());
       setInvoices(fresh.filter(inv => inv.status !== 'Cancelled'));
       closeModal();
     } catch (err) { setFormError(err.response?.data?.message || 'Failed to create return'); }
@@ -115,9 +116,9 @@ const Returns = () => {
   const handleStatusChange = async (returnId, newStatus) => {
     setUpdatingId(returnId);
     try {
-      const { data } = await axios.put(`http://localhost:5000/api/returns/${returnId}/status`, { status: newStatus }, getConfig());
+      const { data } = await axios.put(`${API}/returns/${returnId}/status`, { status: newStatus }, getConfig());
       setReturns(prev => prev.map(r => r._id === returnId ? data : r));
-      const { data: fresh } = await axios.get('http://localhost:5000/api/invoices/shop-all', getConfig());
+      const { data: fresh } = await axios.get(`${API}/invoices/shop-all`, getConfig());
       setInvoices(fresh.filter(inv => inv.status !== 'Cancelled'));
     } catch (err) { alert(err.response?.data?.message || 'Failed to update status'); }
     finally { setUpdatingId(null); }
