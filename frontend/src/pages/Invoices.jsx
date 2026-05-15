@@ -336,7 +336,7 @@ const Invoices = () => {
                           onClick={() => handleWhatsAppShare(inv)}
                           className="flex items-center gap-1 bg-[#25D366]/10 text-[#075E54] border border-[#25D366]/30 px-3 py-1.5 rounded-lg hover:bg-[#25D366]/20 transition text-xs font-bold"
                         >
-                          💬 WhatsApp
+                          {(inv.status === 'Unpaid' || inv.status === 'Partial') ? '📲 Reminder' : '💬 WhatsApp'}
                         </button>
                         {inv.status !== 'Cancelled' && (
                           <button
@@ -374,9 +374,13 @@ const Invoices = () => {
       </div>
       {/* Payment Ledger Modal */}
       {paymentModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity" 
+            onClick={() => setPaymentModal(null)}
+          ></div>
+          <div className="bg-white rounded-[2.5rem] shadow-[0_0_100px_rgba(0,0,0,0.3)] w-full max-w-md max-h-[90vh] overflow-y-auto relative z-[100000] animate-in zoom-in fade-in duration-300 border border-white/20">
+            <div className="sticky top-0 bg-white/95 backdrop-blur-md z-10 px-10 py-8 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-black text-gray-900">Payment Ledger</h2>
                 <p className="text-sm text-gray-500 font-medium">{paymentModal.invoiceNumber || `#${paymentModal._id.substring(18).toUpperCase()}`} — {paymentModal.customer?.name}</p>
@@ -441,7 +445,13 @@ const Invoices = () => {
                   <div>
                     <p className="text-xs font-black text-blue-900 uppercase tracking-widest">Scan & Pay via UPI</p>
                     <p className="text-[10px] text-blue-600 font-bold mt-0.5">{userInfo.upiId}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">Scan this QR with PhonePe, GooglePay, or any UPI app to pay the balance of <b>₹{(paymentModal.finalAmount - (paymentModal.amountPaid || 0)).toLocaleString()}</b></p>
+                    <p className="text-[10px] text-gray-400 mt-1 mb-2">Scan this QR with PhonePe, GooglePay, or any UPI app to pay the balance of <b>₹{(paymentModal.finalAmount - (paymentModal.amountPaid || 0)).toLocaleString()}</b></p>
+                    <a 
+                      href={`upi://pay?pa=${userInfo.upiId}&pn=${encodeURIComponent(userInfo.shopName || '')}&am=${paymentModal.finalAmount - (paymentModal.amountPaid || 0)}&cu=INR`}
+                      className="inline-block px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200"
+                    >
+                      🚀 Click to Pay Now
+                    </a>
                   </div>
                 </div>
               )}
@@ -454,10 +464,10 @@ const Invoices = () => {
                     <input
                       type="number"
                       placeholder="Amount (₹)"
+                      autoFocus
                       value={payForm.amount}
                       onChange={e => setPayForm({ ...payForm, amount: e.target.value })}
                       className="px-4 py-3 border border-gray-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                      max={paymentModal.finalAmount - (paymentModal.amountPaid || 0)}
                     />
                     <select
                       value={payForm.method}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { API } from '../utils/api';
 
 import { printThermal } from '../utils/pdfGenerator';
@@ -18,15 +18,41 @@ const CreateInvoice = () => {
   const [paymentMethod, setPaymentMethod] = useState('Unpaid'); // Unpaid | Cash | UPI | Partial
   const [amountPaidInput, setAmountPaidInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [topProducts, setTopProducts] = useState([]);
   
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
   const barcodeRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    barcodeRef.current?.focus();
     fetchProducts();
+    fetchTopProducts();
+    
+    // Check if converting from quotation
+    if (location.state?.quotationToConvert) {
+      const q = location.state.quotationToConvert;
+      setCustomerMobile(q.customer?.mobile || '');
+      setCustomerName(q.customer?.name || '');
+      setTotalDiscount(q.totalDiscount || 0);
+      setInvoiceProducts(q.products || []);
+      // Clear state to avoid re-running on refresh
+      window.history.replaceState({}, document.title);
+    } else {
+      barcodeRef.current?.focus();
+    }
   }, []);
+
+  const fetchTopProducts = async () => {
+    try {
+      const { data } = await axios.get(`${API}/dashboard/metrics`, {
+        headers: { Authorization: `Bearer ${userInfo.token}` }
+      });
+      // bestSellers has { productId, name, qty, revenue }
+      // We need to match with allProducts to get price/unit etc.
+      setTopProducts(data.bestSellers || []);
+    } catch (err) { console.error('Could not fetch top products'); }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -137,7 +163,13 @@ const CreateInvoice = () => {
       const { data: createdInvoice } = await axios.post(`${API}/invoices`, {
         customerMobile,
         customerName,
-        products: invoiceProducts,
+        products: invoiceProducts.map(item => ({
+          product: item.product?._id || item.product,
+          quantity: item.quantity,
+          price: item.price,
+          gst: item.gst,
+          discount: item.discount || 0
+        })),
         totalDiscount: Number(totalDiscount) || 0,
         status,
         amountPaid: status === 'Paid' ? calculateFinal() : (status === 'Unpaid' ? 0 : (Number(amountPaidInput) || 0)),
@@ -383,20 +415,33 @@ const CreateInvoice = () => {
                 ⚠️ {error}
               </div>
             )}
-            {/* Quick product chips */}
-            {allProducts.length > 0 && !barcodeInput && (
+            {/* Quick product chips - Top 5 Most Sold */}
+            {!barcodeInput && (
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className="text-[10px] font-black uppercase text-gray-400 flex items-center">Quick add:</span>
-                {allProducts
-                  .filter(p => p.stock > 0 && p.status !== 'pending' && (selectedCategory === 'All' || p.category === selectedCategory))
-                  .slice(0, 10)
-                  .map(p => (
-                  <button key={p._id} type="button"
-                    onClick={() => { setBarcodeInput(p.barcode || p.name); setTimeout(() => barcodeRef.current?.form?.requestSubmit(), 50); }}
-                    className="text-xs bg-gray-100 hover:bg-accent hover:text-white text-gray-700 font-bold px-3 py-1.5 rounded-xl transition-all border border-gray-200">
-                    {p.name} — ₹{p.price}/{p.unit || 'Piece'}
-                  </button>
-                ))}
+                <span className="text-[10px] font-black uppercase text-gray-400 flex items-center">🔥 Top Selling:</span>
+                {topProducts.length > 0
+                  ? topProducts.slice(0, 5).map(ts => {
+                      const product = allProducts.find(p => p._id === ts.productId);
+                      if (!product || product.stock < 1) return null;
+                      return (
+                        <button key={ts.productId} type="button"
+                          onClick={() => { setBarcodeInput(product.barcode || product.name); setTimeout(() => barcodeRef.current?.form?.requestSubmit(), 50); }}
+                          className="text-xs bg-orange-50 hover:bg-accent hover:text-white text-orange-700 font-bold px-3 py-1.5 rounded-xl transition-all border border-orange-200">
+                          {product.name} — ₹{product.price}/{product.unit || 'Pc'}
+                        </button>
+                      );
+                    })
+                  : allProducts
+                      .filter(p => p.stock > 0 && p.status !== 'pending')
+                      .slice(0, 5)
+                      .map(p => (
+                        <button key={p._id} type="button"
+                          onClick={() => { setBarcodeInput(p.barcode || p.name); setTimeout(() => barcodeRef.current?.form?.requestSubmit(), 50); }}
+                          className="text-xs bg-gray-100 hover:bg-accent hover:text-white text-gray-700 font-bold px-3 py-1.5 rounded-xl transition-all border border-gray-200">
+                          {p.name} — ₹{p.price}/{p.unit || 'Pc'}
+                        </button>
+                      ))
+                }
               </div>
             )}
           </div>

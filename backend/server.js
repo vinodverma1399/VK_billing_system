@@ -53,6 +53,7 @@ app.use('/api/returns', require('./routes/returnRoutes'));
 app.use('/api/expenses', require('./routes/expenseRoutes'));
 app.use('/api/audit', require('./routes/auditRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
+app.use('/api/quotations', require('./routes/quotationRoutes'));
 
 // Database connection
 const connectDB = async () => {

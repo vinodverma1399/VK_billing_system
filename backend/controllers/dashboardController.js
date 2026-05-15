@@ -194,11 +194,22 @@ const getMetrics = async (req, res) => {
       });
     });
 
-    // Enrich with product names
+    // Enrich with product details
     const productMap = {};
-    allProducts.forEach(p => { productMap[p._id.toString()] = p.name; });
+    allProducts.forEach(p => { 
+      productMap[p._id.toString()] = {
+        name: p.name,
+        category: p.category || '-',
+        barcode: p.barcode || 'N/A'
+      };
+    });
     const bestSellers = Object.values(salesByProduct)
-      .map(s => ({ ...s, name: productMap[s.productId] || 'Unknown' }))
+      .map(s => ({ 
+        ...s, 
+        name: productMap[s.productId]?.name || 'Unknown',
+        category: productMap[s.productId]?.category || '-',
+        barcode: productMap[s.productId]?.barcode || 'N/A'
+      }))
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5);
 
@@ -229,4 +240,72 @@ const getMetrics = async (req, res) => {
   }
 };
 
-module.exports = { getMetrics };
+
+// @desc    Get best sellers filtered by date range
+// @route   GET /api/dashboard/best-sellers?range=today|week|month|custom&from=&to=
+// @access  Private
+const getBestSellers = async (req, res) => {
+  try {
+    const userId = req.ownerId;
+    const { range, from, to } = req.query;
+
+    const now = new Date();
+    let startDate, endDate = now;
+
+    if (range === 'today') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (range === 'week') {
+      startDate = new Date(now); startDate.setDate(now.getDate() - 7);
+    } else if (range === 'month') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (range === 'custom' && from && to) {
+      startDate = new Date(from);
+      endDate = new Date(to); endDate.setHours(23, 59, 59, 999);
+    } else {
+      // All time
+      startDate = new Date('2020-01-01');
+    }
+
+    const invoices = await Invoice.find({
+      user: userId,
+      status: { $ne: 'Cancelled' },
+      createdAt: { $gte: startDate, $lte: endDate }
+    });
+
+    const allProducts = await Product.find({ user: userId });
+    const productMap = {};
+    allProducts.forEach(p => {
+      productMap[p._id.toString()] = {
+        name: p.name,
+        category: p.category || '-',
+        barcode: p.barcode || 'N/A'
+      };
+    });
+
+    const salesByProduct = {};
+    invoices.forEach(inv => {
+      (inv.products || []).forEach(item => {
+        const pId = item.product?.toString() || 'unknown';
+        if (!salesByProduct[pId]) salesByProduct[pId] = { productId: pId, qty: 0, revenue: 0 };
+        salesByProduct[pId].qty += item.quantity;
+        salesByProduct[pId].revenue += item.total;
+      });
+    });
+
+    const bestSellers = Object.values(salesByProduct)
+      .map(s => ({
+        ...s,
+        name: productMap[s.productId]?.name || 'Unknown',
+        category: productMap[s.productId]?.category || '-',
+        barcode: productMap[s.productId]?.barcode || 'N/A'
+      }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+
+    res.json({ bestSellers, from: startDate, to: endDate });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getMetrics, getBestSellers };

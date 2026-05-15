@@ -149,6 +149,47 @@ const Customers = () => {
     } catch (e) { setStatementData({ invoices: [], returns: [], loading: false }); }
   };
 
+  const handleSendReminder = (customer, balance) => {
+    const shopName = userInfo.shopName || 'Our Shop';
+    const upiId = userInfo.upiId || '';
+    const mobile = customer.mobile;
+
+    // Build unpaid invoices list
+    const unpaidInvoices = invoices.filter(inv => {
+      const isThisCustomer = inv.customer?._id === customer._id || inv.customer === customer._id;
+      const hasBalance = (inv.finalAmount - (inv.amountPaid || 0)) > 0;
+      return isThisCustomer && hasBalance && inv.status !== 'Cancelled';
+    });
+
+    let msg = `Namaste *${customer.name}* ji! 🙏\n\n`;
+    msg += `*${shopName}* ki taraf se yaad dila rahe hain:\n`;
+    msg += `------------------------\n`;
+
+    unpaidInvoices.forEach(inv => {
+      const bal = (inv.finalAmount - (inv.amountPaid || 0));
+      const invNum = inv.invoiceNumber || inv._id?.toString().slice(-6).toUpperCase();
+      const status = inv.status;
+      msg += `Bill: *${invNum}*\n`;
+      msg += `Status: ${status} | Due: *₹${bal.toLocaleString()}*\n`;
+      msg += `\n`;
+    });
+
+    msg += `------------------------\n`;
+    msg += `*Total Baki: ₹${balance.toLocaleString()}*\n\n`;
+
+    if (upiId) {
+      const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${balance.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Bill Payment')}`;
+      msg += `💳 *Online Payment Link:*\n${upiLink}\n\n`;
+      msg += `👆 Is link par click karke GPay/PhonePe/Paytm se turant payment karein!\n\n`;
+    }
+
+    msg += `Aapka saath karte hain. Dhanyawad! 🙏\n`;
+    msg += `*${shopName}*`;
+
+    const whatsappUrl = `https://wa.me/91${mobile}?text=${encodeURIComponent(msg)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const filtered = customers.filter(c =>
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
     c.mobile?.includes(search)
@@ -333,7 +374,16 @@ const Customers = () => {
                           )}
                         </td>
                         <td className="px-8 py-5 sticky right-0 bg-white lg:bg-transparent shadow-[-10px_0_10px_-5px_rgba(0,0,0,0.05)] lg:shadow-none">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2 flex-wrap">
+                            {bal > 0 && (
+                              <button
+                                onClick={() => handleSendReminder(c, bal)}
+                                className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-xl text-xs font-black hover:bg-green-100 transition flex items-center gap-1"
+                                title="Send WhatsApp payment reminder with UPI link"
+                              >
+                                💬 Reminder
+                              </button>
+                            )}
                             <button onClick={() => openStatement(c)} className="px-3 py-1.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-black hover:bg-gray-100 transition">📋 Statement</button>
                             {userRole === 'Admin' ? (
                               <>

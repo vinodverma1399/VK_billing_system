@@ -86,6 +86,65 @@ const Products = () => {
     }
   };
 
+  const handlePrintBarcode = (product) => {
+    if (!product.barcode) return alert("No barcode available to print!");
+    
+    const shopName = userInfo.shopName || 'VK Billing System';
+    const printWindow = window.open('', '_blank', 'width=400,height=400');
+    
+    const gstPercent = product.gst || 0;
+    const finalPrice = product.price + (product.price * gstPercent / 100);
+
+    // We create a tiny HTML page for the 50x30mm thermal label printer
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Barcode - ${product.name}</title>
+          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+          <style>
+            body { 
+              text-align: center; 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding-top: 5px; 
+            }
+            .shop { font-size: 10px; font-weight: bold; margin-bottom: 2px; }
+            .category { font-size: 9px; font-weight: bold; color: #555; text-transform: uppercase; margin-bottom: 1px; }
+            .name { font-size: 11px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95%; margin-left: auto; margin-right: auto; }
+            .price { font-size: 15px; font-weight: 900; margin-bottom: 2px; }
+            .gst-tag { font-size: 8px; font-weight: normal; }
+            @media print {
+              body { margin: 0; padding: 0; }
+              @page { size: 50mm 30mm; margin: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="shop">${shopName}</div>
+          <div class="category">${product.category || 'Item'}</div>
+          <div class="name">${product.name}</div>
+          <div class="price">Rs ${finalPrice.toFixed(0)} <span class="gst-tag">(Incl. GST)</span></div>
+          <svg id="barcode"></svg>
+          <script>
+            window.onload = () => {
+              JsBarcode("#barcode", "${product.barcode}", {
+                width: 1.5,
+                height: 35,
+                fontSize: 10,
+                margin: 0
+              });
+              setTimeout(() => {
+                window.print();
+                window.close();
+              }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const openAdd = () => {
     setEditProduct(null);
     setForm({ name: '', category: dbCategories.length > 0 ? dbCategories[0].name : '', unit: 'Piece', price: '', gst: '0', barcode: '', stock: '0', costPrice: '0', lowStockThreshold: '5' });
@@ -323,8 +382,9 @@ const Products = () => {
                         <span className="text-[10px] text-amber-500 font-bold italic">Awaiting approval</span>
                       ) : userRole === 'Admin' ? (
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => openEdit(p)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition">✏️</button>
-                          <button onClick={() => handleDelete(p._id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition">🗑️</button>
+                          <button onClick={() => handlePrintBarcode(p)} className="p-2 bg-gray-50 text-gray-700 rounded-xl hover:bg-gray-200 transition" title="Print Barcode">🖨️</button>
+                          <button onClick={() => openEdit(p)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition" title="Edit Product">✏️</button>
+                          <button onClick={() => handleDelete(p._id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition" title="Delete Product">🗑️</button>
                         </div>
                       ) : (
                         <span className="text-[10px] text-gray-300 italic">View only</span>
@@ -421,7 +481,7 @@ const Products = () => {
                 <label className="text-xs font-black uppercase tracking-widest text-gray-400">Barcode</label>
                 <input type="text" value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })}
                   className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent transition-all outline-none font-mono font-bold"
-                  placeholder="Scan code..." />
+                  placeholder="Scan code or leave empty to auto-generate" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase tracking-widest text-gray-400">Opening Stock</label>

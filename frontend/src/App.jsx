@@ -7,6 +7,8 @@ import Products from './pages/Products'
 import Invoices from './pages/Invoices'
 import CreateInvoice from './pages/CreateInvoice'
 import EditInvoice from './pages/EditInvoice'
+import Quotations from './pages/Quotations'
+import CreateQuotation from './pages/CreateQuotation'
 import Dashboard from './pages/Dashboard'
 import Vendors from './pages/Vendors'
 import StockEntry from './pages/StockEntry'
@@ -37,6 +39,7 @@ const Layout = ({ children }) => {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: '📊', adminOnly: true },
     { name: 'Invoices', path: '/invoices', icon: '🧾' },
+    { name: 'Estimates', path: '/quotations', icon: '📝' },
     { name: 'Inventory', path: '/products', icon: '📦' },
     { name: 'Customers', path: '/customers', icon: '👥' },
     { name: 'Vendors', path: '/vendors', icon: '🏢', adminOnly: true },
@@ -146,7 +149,7 @@ const Layout = ({ children }) => {
 
       {/* Main Content Area */}
       <main className="flex-1 lg:ml-[21rem] w-full p-4 lg:p-8 min-h-screen relative z-10 pt-24 lg:pt-8 transition-all duration-300">
-        <div className="max-w-6xl mx-auto animate-slide-up pb-20">
+        <div className="max-w-6xl mx-auto pb-20">
           {children}
         </div>
       </main>
@@ -193,6 +196,8 @@ function App() {
           <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
           <Route path="/invoices/new" element={<ProtectedRoute><CreateInvoice /></ProtectedRoute>} />
           <Route path="/invoices/:id/edit" element={<ProtectedRoute><EditInvoice /></ProtectedRoute>} />
+          <Route path="/quotations" element={<ProtectedRoute><Quotations /></ProtectedRoute>} />
+          <Route path="/create-quotation" element={<ProtectedRoute><CreateQuotation /></ProtectedRoute>} />
           <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
           <Route path="/purchases" element={<ProtectedRoute><StockEntry /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />

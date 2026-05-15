@@ -55,6 +55,11 @@ const createProduct = async (req, res) => {
   try {
     const { name, category, unit, price, gst, barcode, stock, costPrice, lowStockThreshold } = req.body;
 
+    const catPrefix = category ? category.substring(0, 3).toUpperCase() : 'VK';
+    const namePrefix = name ? name.substring(0, 3).toUpperCase() : 'PRD';
+    const generateBarcode = () => `${catPrefix}${namePrefix}` + Math.floor(1000 + Math.random() * 9000);
+    const finalBarcode = barcode && barcode.trim() ? barcode.trim() : generateBarcode();
+
     // Staff submissions go pending; Admin submissions go directly active
     const status = req.user.role === 'Staff' ? 'pending' : 'active';
 
@@ -64,7 +69,7 @@ const createProduct = async (req, res) => {
       unit: unit || 'Piece',
       price,
       gst: gst || 0,
-      barcode: barcode || undefined,
+      barcode: finalBarcode,
       stock: stock || 0,
       costPrice: costPrice || 0,
       lowStockThreshold: lowStockThreshold !== undefined ? lowStockThreshold : 5,

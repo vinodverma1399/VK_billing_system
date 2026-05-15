@@ -25,7 +25,11 @@ const StatusBadge = ({ status }) => {
 const Dashboard = () => {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeAlert, setActiveAlert] = useState('lowStock'); // lowStock | overdue | customers | vendors
+  const [activeAlert, setActiveAlert] = useState('lowStock');
+  const [bsRange, setBsRange] = useState('all'); // best sellers range
+  const [bsFrom, setBsFrom] = useState('');
+  const [bsTo, setBsTo] = useState('');
+  const [bestSellers, setBestSellers] = useState([]);
 
   const userInfo = JSON.parse(localStorage.getItem('userInfo')) || {};
   const shopkeeperName = userInfo.name || 'Dashboard';
@@ -63,6 +67,21 @@ const Dashboard = () => {
     return () => socket.disconnect();
   }, []);
 
+  const fetchBestSellers = async (range, from, to) => {
+    try {
+      const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+      let url = `${API}/dashboard/best-sellers?range=${range}`;
+      if (range === 'custom' && from && to) url += `&from=${from}&to=${to}`;
+      const { data } = await axios.get(url, config);
+      setBestSellers(data.bestSellers || []);
+    } catch (err) { console.error('Best sellers fetch failed', err); }
+  };
+
+  const handleBsRangeChange = (range) => {
+    setBsRange(range);
+    if (range !== 'custom') fetchBestSellers(range, '', '');
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center h-[70vh] space-y-6">
@@ -79,6 +98,8 @@ const Dashboard = () => {
 
   const m = metrics;
   const alertCount = (m.lowStockProducts?.length || 0) + (m.overdueList?.length || 0);
+  // Best sellers: use filtered data if available, else from metrics
+  const displayBestSellers = bestSellers.length > 0 ? bestSellers : (m.bestSellers || []);
 
   // ── Stat Cards ────────────────────────────────────────────────────────
   const statCards = [
@@ -421,30 +442,57 @@ const Dashboard = () => {
         {/* Best Sellers */}
         <div className="bg-white/60 backdrop-blur-xl rounded-[2.5rem] shadow-xl shadow-gray-200/50 border border-white overflow-hidden">
           <div className="px-8 py-6 border-b border-gray-100">
-            <h2 className="text-lg font-black text-gray-900 tracking-tight">🎯 Best Selling Products</h2>
-            <p className="text-gray-400 text-xs font-medium">Auto-ranked by units sold</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h2 className="text-lg font-black text-gray-900 tracking-tight">🎯 Best Selling Products</h2>
+                <p className="text-gray-400 text-xs font-medium">Filter by time period</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[['all','All Time'],['today','Today'],['week','This Week'],['month','This Month'],['custom','Custom']].map(([val, label]) => (
+                  <button key={val} onClick={() => handleBsRangeChange(val)}
+                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                      bsRange === val ? 'bg-gray-900 text-white shadow' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}>{label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {bsRange === 'custom' && (
+              <div className="flex gap-3 mt-4 flex-wrap">
+                <input type="date" value={bsFrom} onChange={e => setBsFrom(e.target.value)}
+                  className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none focus:border-blue-400" />
+                <input type="date" value={bsTo} onChange={e => setBsTo(e.target.value)}
+                  className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none focus:border-blue-400" />
+                <button onClick={() => fetchBestSellers('custom', bsFrom, bsTo)}
+                  className="px-5 py-2 bg-blue-600 text-white rounded-xl font-black text-xs hover:bg-blue-700 transition">
+                  Apply
+                </button>
+              </div>
+            )}
           </div>
           <div className="p-6 space-y-3">
-            {m.bestSellers?.length === 0 ? (
-              <p className="text-center py-6 text-gray-400 font-medium">No sales data yet</p>
+            {displayBestSellers.length === 0 ? (
+              <p className="text-center py-6 text-gray-400 font-medium">No sales data for this period</p>
             ) : (
-              m.bestSellers.map((p, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${
+              displayBestSellers.map((p, i) => (
+                <div key={i} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-gray-50 transition">
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
                     i === 0 ? 'bg-yellow-100 text-yellow-700' :
                     i === 1 ? 'bg-gray-100 text-gray-600' :
                     i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-400'
                   }`}>{i + 1}</span>
-                  <div className="flex-1">
-                    <div className="font-black text-gray-900 text-sm">{p.name}</div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1">
-                      <div
-                        className="bg-blue-500 h-1.5 rounded-full"
-                        style={{ width: `${Math.min(100, (p.qty / (m.bestSellers[0]?.qty || 1)) * 100)}%` }}
-                      />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-black text-gray-900 text-sm truncate">{p.name}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-lg font-bold">{p.category}</span>
+                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-lg font-mono font-bold">{p.barcode}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5">
+                      <div className="bg-blue-500 h-1.5 rounded-full"
+                        style={{ width: `${Math.min(100, (p.qty / (displayBestSellers[0]?.qty || 1)) * 100)}%` }} />
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <div className="font-black text-gray-800 text-sm">{p.qty} units</div>
                     <div className="text-xs text-emerald-600 font-bold">{fmt(p.revenue)}</div>
                   </div>
