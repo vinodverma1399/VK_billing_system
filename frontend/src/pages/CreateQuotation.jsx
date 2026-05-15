@@ -14,6 +14,9 @@ const CreateQuotation = () => {
   const [error, setError] = useState('');
   const [lastQuotation, setLastQuotation] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(0);
+  const [filteredProducts, setFilteredProducts] = useState([]);
 
   const barcodeInputRef = useRef(null);
   const navigate = useNavigate();
@@ -36,32 +39,82 @@ const CreateQuotation = () => {
   };
 
   const handleBarcodeSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!barcodeInput.trim()) return;
     setError('');
 
-    const query = barcodeInput.trim();
-    setBarcodeInput('');
+    // If suggestions are open and Enter is pressed, select the active one
+    if (showSuggestions && filteredProducts.length > 0) {
+      selectProduct(filteredProducts[activeSuggestion]);
+      return;
+    }
 
     try {
-      const { data: product } = await axios.get(`${API}/products/barcode/${encodeURIComponent(query)}`, getConfig());
-      
-      const existingItem = invoiceProducts.find(p => p.product._id === product._id);
-      if (existingItem) {
-        setInvoiceProducts(invoiceProducts.map(p => 
-          p.product._id === product._id ? { ...p, quantity: p.quantity + 1 } : p
-        ));
-      } else {
-        setInvoiceProducts([...invoiceProducts, {
-          product,
-          quantity: 1,
-          price: product.price,
-          gst: product.gst,
-          discount: 0
-        }]);
-      }
+      const { data: product } = await axios.get(`${API}/products/barcode/${encodeURIComponent(barcodeInput.trim())}`, getConfig());
+      selectProduct(product);
     } catch (err) {
       setError(err.response?.data?.message || 'Product not found');
+      setBarcodeInput('');
+      setShowSuggestions(false);
+      setTimeout(() => barcodeInputRef.current?.focus(), 50);
+    }
+  };
+
+  const selectProduct = (product) => {
+    if (!product || !product._id) return;
+    
+    const existingItem = invoiceProducts.find(p => p.product._id === product._id);
+    if (existingItem) {
+      setInvoiceProducts(invoiceProducts.map(p => 
+        p.product._id === product._id ? { ...p, quantity: p.quantity + 1 } : p
+      ));
+    } else {
+      setInvoiceProducts([...invoiceProducts, {
+        product,
+        quantity: 1,
+        price: product.price,
+        gst: product.gst,
+        discount: 0
+      }]);
+    }
+    setError('');
+    setBarcodeInput('');
+    setShowSuggestions(false);
+    setTimeout(() => barcodeInputRef.current?.focus(), 50);
+  };
+
+  const onSearchChange = (e) => {
+    const value = e.target.value;
+    setBarcodeInput(value);
+    
+    if (value.trim()) {
+      const filtered = allProducts.filter(p => 
+        p.status === 'active' && 
+        (p.name.toLowerCase().includes(value.toLowerCase()) || 
+         (p.barcode && p.barcode.toLowerCase().includes(value.toLowerCase())))
+      );
+      setFilteredProducts(filtered);
+      setShowSuggestions(true);
+      setActiveSuggestion(0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.keyCode === 13) { // Enter
+      if (showSuggestions && filteredProducts.length > 0) {
+        e.preventDefault();
+        selectProduct(filteredProducts[activeSuggestion]);
+      }
+    } else if (e.keyCode === 38) { // Up arrow
+      if (activeSuggestion === 0) return;
+      setActiveSuggestion(activeSuggestion - 1);
+    } else if (e.keyCode === 40) { // Down arrow
+      if (activeSuggestion === filteredProducts.length - 1) return;
+      setActiveSuggestion(activeSuggestion + 1);
+    } else if (e.keyCode === 27) { // Escape
+      setShowSuggestions(false);
     }
   };
 
@@ -144,16 +197,50 @@ const CreateQuotation = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white p-6 rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100">
             <h2 className="text-lg font-black text-gray-900 mb-4 uppercase tracking-widest">Scan or Search Product</h2>
-            <form onSubmit={handleBarcodeSubmit} className="flex gap-4">
-              <input
-                ref={barcodeInputRef}
-                type="text"
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Scan barcode or type name..."
-                className="flex-1 px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-400 transition-all outline-none font-bold text-lg"
-              />
-              <button type="submit" className="px-8 bg-amber-500 text-white font-bold rounded-2xl shadow-lg hover:bg-amber-600 hover:-translate-y-0.5 transition-all">
+            <form onSubmit={handleBarcodeSubmit} className="flex gap-4 relative">
+              <div className="flex-1 relative">
+                <input
+                  ref={barcodeInputRef}
+                  type="text"
+                  value={barcodeInput}
+                  onChange={onSearchChange}
+                  onKeyDown={onKeyDown}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  placeholder="Scan barcode or type name..."
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-400 transition-all outline-none font-bold text-lg"
+                  autoComplete="off"
+                />
+                
+                {showSuggestions && filteredProducts.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[999] max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                    {filteredProducts.map((p, index) => (
+                      <div
+                        key={p._id}
+                        className={`px-5 py-3 cursor-pointer flex justify-between items-center transition-colors ${
+                          index === activeSuggestion ? 'bg-amber-50 border-l-4 border-amber-400' : 'hover:bg-gray-50'
+                        }`}
+                        onMouseDown={() => selectProduct(p)}
+                        onMouseEnter={() => setActiveSuggestion(index)}
+                      >
+                        <div className="flex-1">
+                          <div className="font-black text-gray-900 text-sm">
+                            {p.name}
+                            {p.barcode && <span className="ml-2 font-mono text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">#{p.barcode}</span>}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{p.category || 'General'} • {p.unit || 'Pc'}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-black text-amber-600 text-sm">₹{p.price}</div>
+                          <div className={`text-[10px] font-bold ${p.stock < 5 ? 'text-red-500' : 'text-emerald-600'}`}>
+                            Stock: {p.stock}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button type="submit" className="px-8 bg-amber-500 text-white font-bold rounded-2xl shadow-lg hover:bg-amber-600 hover:-translate-y-0.5 transition-all h-[60px]">
                 Add
               </button>
             </form>

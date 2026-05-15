@@ -19,6 +19,9 @@ const CreateInvoice = () => {
   const [amountPaidInput, setAmountPaidInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [topProducts, setTopProducts] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(0);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
   const barcodeRef = useRef(null);
@@ -65,57 +68,105 @@ const CreateInvoice = () => {
   };
 
   const handleBarcodeScan = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!barcodeInput.trim()) return;
+
+    // If we have filtered products and pressing Enter, select the active one
+    if (showSuggestions && filteredProducts.length > 0) {
+      selectProduct(filteredProducts[activeSuggestion]);
+      return;
+    }
 
     try {
       const userInfo = JSON.parse(localStorage.getItem('userInfo'));
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
       
       const { data: product } = await axios.get(`${API}/products/barcode/${barcodeInput.trim()}`, config);
-      
-      if (!product || !product._id) throw new Error('Product not found');
-      
-      const existingIndex = invoiceProducts.findIndex(p => p.product === product._id);
-      
-      if (existingIndex >= 0) {
-        const updated = [...invoiceProducts];
-        const newQty = updated[existingIndex].quantity + 1;
-        if (newQty > product.stock) {
-          setError(`⚠️ Only ${product.stock} in stock for "${product.name}"`);
-          setBarcodeInput('');
-          barcodeRef.current?.focus();
-          return;
-        }
-        updated[existingIndex].quantity = newQty;
-        setInvoiceProducts(updated);
-      } else {
-        if (product.stock < 1) {
-          setError(`⚠️ "${product.name}" is out of stock!`);
-          setBarcodeInput('');
-          barcodeRef.current?.focus();
-          return;
-        }
-        setInvoiceProducts([...invoiceProducts, {
-          product: product._id,
-          name: product.name,
-          category: product.category,
-          price: product.price,
-          gst: product.gst,
-          stock: product.stock,
-          unit: product.unit || 'Piece',
-          quantity: 1,
-          discount: 0
-        }]);
-      }
-      setError('');
-      setBarcodeInput('');
-      // Auto-focus back for next scan — critical for barcode gun workflow
-      setTimeout(() => barcodeRef.current?.focus(), 50);
+      selectProduct(product);
     } catch (err) {
       setError(err.response?.data?.message || `"${barcodeInput}" not found in inventory`);
       setBarcodeInput('');
+      setShowSuggestions(false);
       setTimeout(() => barcodeRef.current?.focus(), 50);
+    }
+  };
+
+  const selectProduct = (product) => {
+    if (!product || !product._id) return;
+    
+    const existingIndex = invoiceProducts.findIndex(p => p.product === product._id);
+    
+    if (existingIndex >= 0) {
+      const updated = [...invoiceProducts];
+      const newQty = updated[existingIndex].quantity + 1;
+      if (newQty > product.stock) {
+        setError(`⚠️ Only ${product.stock} in stock for "${product.name}"`);
+        setBarcodeInput('');
+        setShowSuggestions(false);
+        barcodeRef.current?.focus();
+        return;
+      }
+      updated[existingIndex].quantity = newQty;
+      setInvoiceProducts(updated);
+    } else {
+      if (product.stock < 1) {
+        setError(`⚠️ "${product.name}" is out of stock!`);
+        setBarcodeInput('');
+        setShowSuggestions(false);
+        barcodeRef.current?.focus();
+        return;
+      }
+      setInvoiceProducts([...invoiceProducts, {
+        product: product._id,
+        name: product.name,
+        category: product.category,
+        price: product.price,
+        gst: product.gst,
+        stock: product.stock,
+        unit: product.unit || 'Piece',
+        quantity: 1,
+        discount: 0
+      }]);
+    }
+    setError('');
+    setBarcodeInput('');
+    setShowSuggestions(false);
+    setTimeout(() => barcodeRef.current?.focus(), 50);
+  };
+
+  const onSearchChange = (e) => {
+    const value = e.target.value;
+    setBarcodeInput(value);
+    
+    if (value.trim()) {
+      const filtered = allProducts.filter(p => 
+        p.status !== 'pending' && 
+        (selectedCategory === 'All' || p.category === selectedCategory) &&
+        (p.name.toLowerCase().includes(value.toLowerCase()) || 
+         (p.barcode && p.barcode.toLowerCase().includes(value.toLowerCase())))
+      );
+      setFilteredProducts(filtered);
+      setShowSuggestions(true);
+      setActiveSuggestion(0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.keyCode === 13) { // Enter
+      if (showSuggestions && filteredProducts.length > 0) {
+        e.preventDefault();
+        selectProduct(filteredProducts[activeSuggestion]);
+      }
+    } else if (e.keyCode === 38) { // Up arrow
+      if (activeSuggestion === 0) return;
+      setActiveSuggestion(activeSuggestion - 1);
+    } else if (e.keyCode === 40) { // Down arrow
+      if (activeSuggestion === filteredProducts.length - 1) return;
+      setActiveSuggestion(activeSuggestion + 1);
+    } else if (e.keyCode === 27) { // Escape
+      setShowSuggestions(false);
     }
   };
 
@@ -388,22 +439,45 @@ const CreateInvoice = () => {
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">📷</span>
                 <input
                   type="text"
-                  list="product-list"
                   placeholder="Scan barcode  OR  type product name..."
                   className="w-full pl-11 pr-4 py-3.5 border-2 border-accent/30 rounded-2xl focus:ring-4 focus:ring-accent/10 focus:border-accent outline-none font-bold text-gray-900 bg-accent/5 placeholder-gray-400 transition-all"
                   value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onChange={onSearchChange}
+                  onKeyDown={onKeyDown}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                   ref={barcodeRef}
                   autoComplete="off"
                   autoFocus
                 />
-                <datalist id="product-list">
-                  {allProducts.filter(p => p.status !== 'pending' && (selectedCategory === 'All' || p.category === selectedCategory)).map((p) => (
-                    <option key={p._id} value={p.barcode || p.name}>
-                      {p.name} {p.barcode ? `[${p.barcode}]` : ''} — ₹{p.price} / {p.unit || 'Piece'} (Stock: {p.stock})
-                    </option>
-                  ))}
-                </datalist>
+                
+                {showSuggestions && filteredProducts.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[999] max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                    {filteredProducts.map((p, index) => (
+                      <div
+                        key={p._id}
+                        className={`px-5 py-3 cursor-pointer flex justify-between items-center transition-colors ${
+                          index === activeSuggestion ? 'bg-accent/10 border-l-4 border-accent' : 'hover:bg-gray-50'
+                        }`}
+                        onMouseDown={() => selectProduct(p)}
+                        onMouseEnter={() => setActiveSuggestion(index)}
+                      >
+                        <div className="flex-1">
+                          <div className="font-black text-gray-900 text-sm">
+                            {p.name}
+                            {p.barcode && <span className="ml-2 font-mono text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">#{p.barcode}</span>}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{p.category || 'General'} • {p.unit || 'Pc'}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-black text-accent text-sm">₹{p.price}</div>
+                          <div className={`text-[10px] font-bold ${p.stock < 5 ? 'text-red-500' : 'text-emerald-600'}`}>
+                            Stock: {p.stock}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <button type="submit"
                 className="bg-accent text-white px-7 py-3.5 rounded-2xl font-black hover:bg-accent/90 active:scale-95 transition-all shadow-lg shadow-accent/20 flex items-center gap-2">
