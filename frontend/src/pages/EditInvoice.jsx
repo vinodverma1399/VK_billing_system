@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { API } from '../utils/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { generateInvoicePDF, printThermal } from '../utils/pdfGenerator';
 
@@ -31,7 +32,7 @@ const EditInvoice = () => {
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
-        const { data } = await axios.get('http://localhost:5000/api/invoices', getConfig());
+        const { data } = await axios.get(`${API}/invoices`, getConfig());
         const found = data.find(inv => inv._id === id);
         if (!found) { navigate('/invoices'); return; }
         if (found.status === 'Cancelled') {
@@ -75,7 +76,7 @@ const EditInvoice = () => {
     if (!barcodeInput) return;
     try {
       const { data: product } = await axios.get(
-        `http://localhost:5000/api/products/barcode/${barcodeInput}`,
+        `${API}/products/barcode/${barcodeInput}`,
         getConfig()
       );
       if (!product?._id) throw new Error('Invalid product');
@@ -152,7 +153,7 @@ const EditInvoice = () => {
     setError('');
     try {
       const { data } = await axios.put(
-        `http://localhost:5000/api/invoices/${id}`,
+        `${API}/invoices/${id}`,
         {
           products: invoiceProducts,
           totalDiscount: Number(totalDiscount) || 0,
@@ -175,7 +176,7 @@ const EditInvoice = () => {
     try {
       const balance = invoice.finalAmount - (invoice.amountPaid || 0);
       const { data } = await axios.post(
-        `http://localhost:5000/api/invoices/${invoice._id}/payments`,
+        `${API}/invoices/${invoice._id}/payments`,
         { amount: balance, method: 'UPI', note: 'Quick pay from success screen' },
         getConfig()
       );
